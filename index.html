@@ -207,7 +207,7 @@
   <div class="section">
     <div class="section-head">
       <span class="idx">01</span><h2>Occurrence Timeline</h2>
-      <span class="note">station = month · red node = peak load</span>
+      <span class="note">latest 12 months · red node = peak load</span>
     </div>
     <div class="panel">
       <div class="track-wrap">
@@ -222,15 +222,18 @@
   <div class="section">
     <div class="section-head">
       <span class="idx">02</span><h2>Fault Category Breakdown</h2>
-      <span class="note" id="catNote">auto-classified from free-text reason logs</span>
+      <span class="note" id="catNote">top 10 issues + Other Issue; remaining issues shown separately</span>
     </div>
     <div class="grid-2">
       <div class="panel">
-        <div style="height:340px;"><canvas id="categoryBar"></canvas></div>
+        <div style="height:360px;"><canvas id="categoryBar"></canvas></div>
       </div>
       <div class="panel">
-        <div style="height:340px;"><canvas id="stackedChart"></canvas></div>
+        <div style="height:360px;"><canvas id="otherIssueChart"></canvas></div>
       </div>
+    </div>
+    <div class="panel" style="margin-top:16px;">
+      <div style="height:390px;"><canvas id="stackedChart"></canvas></div>
     </div>
   </div>
 
@@ -238,7 +241,7 @@
   <div class="section">
     <div class="section-head">
       <span class="idx">03</span><h2>Temporal Patterns</h2>
-      <span class="note">when faults get logged</span>
+      <span class="note">when faults get logged · 3 shifts</span>
     </div>
     <div class="grid-2">
       <div class="panel">
@@ -246,7 +249,7 @@
         <div style="height:250px;"><canvas id="weekdayChart"></canvas></div>
       </div>
       <div class="panel">
-        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Occurrences by time of day (actual arrival)</div>
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Occurrences by shift (actual arrival)</div>
         <div style="height:250px;"><canvas id="todChart"></canvas></div>
       </div>
     </div>
@@ -278,12 +281,12 @@
   <div class="section">
     <div class="section-head">
       <span class="idx">05</span><h2>Supervisor Load &amp; Recurring Reasons</h2>
-      <span class="note">top 10 supervisors · top 12 exact reason strings</span>
+      <span class="note">top 15 supervisors · top 12 exact reason strings</span>
     </div>
     <div class="grid-2">
       <div class="panel">
         <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Supervisor-wise occurrences handled</div>
-        <div style="height:280px;"><canvas id="supChart"></canvas></div>
+        <div style="height:360px;"><canvas id="supChart"></canvas></div>
       </div>
       <div class="panel">
         <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Most frequently logged exact reasons</div>
@@ -2018,16 +2021,18 @@ function computeAggregates(records){
   const nowGuard = new Date();
   const datedTS = dated.filter(r=>r.date <= nowGuard);
 
-  // ---- monthly ----
-  const monthMap = new Map();
+  // ---- monthly: latest 12 months only, based on latest valid date in the register ----
+  const allMonthMap = new Map();
   datedTS.forEach(r=>{
     const key = r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
-    if(!monthMap.has(key)) monthMap.set(key, {label:r.date.toLocaleString('en-US',{month:'short'})+' '+r.date.getFullYear(), occurrences:0, detSum:0, detCount:0, ym:key});
-    const mo = monthMap.get(key);
+    if(!allMonthMap.has(key)) allMonthMap.set(key, {label:r.date.toLocaleString('en-US',{month:'short'})+' '+r.date.getFullYear(), occurrences:0, detSum:0, detCount:0, ym:key});
+    const mo = allMonthMap.get(key);
     mo.occurrences++;
     if(r.detentionMin!=null){ mo.detSum += r.detentionMin; mo.detCount++; }
   });
-  const monthsSorted = [...monthMap.values()].sort((a,b)=>a.ym.localeCompare(b.ym));
+  const allMonthsSorted = [...allMonthMap.values()].sort((a,b)=>a.ym.localeCompare(b.ym));
+  const latest12Keys = new Set(allMonthsSorted.slice(-12).map(m=>m.ym));
+  const monthsSorted = allMonthsSorted.slice(-12);
   const monthly = {
     labels: monthsSorted.map(m=>m.label),
     occurrences: monthsSorted.map(m=>m.occurrences),
@@ -2036,21 +2041,34 @@ function computeAggregates(records){
     recorded_count: monthsSorted.map(m=>m.detCount)
   };
 
-  // ---- categories ----
+  // ---- categories: top 10 + one combined "Other Issue" category ----
   const catCount = new Map();
   withCat.forEach(r=>{ catCount.set(r.cat, (catCount.get(r.cat)||0)+1); });
   const catSorted = [...catCount.entries()].sort((a,b)=>b[1]-a[1]);
-  const categories = { labels: catSorted.map(c=>c[0]), values: catSorted.map(c=>c[1]) };
+  const top10Categories = catSorted.slice(0,10);
+  const top10Names = new Set(top10Categories.map(c=>c[0]));
+  const otherIssueEntries = catSorted.filter(c=>!top10Names.has(c[0]));
+  const otherIssueTotal = otherIssueEntries.reduce((sum,c)=>sum+c[1],0);
+  const categories = {
+    labels: top10Categories.map(c=>c[0]).concat(otherIssueTotal>0 ? ['Other Issue'] : []),
+    values: top10Categories.map(c=>c[1]).concat(otherIssueTotal>0 ? [otherIssueTotal] : [])
+  };
+  const otherIssues = {
+    labels: otherIssueEntries.map(c=>c[0]),
+    values: otherIssueEntries.map(c=>c[1])
+  };
 
-  // ---- stacked (top 8 categories x month) ----
-  const top8 = catSorted.slice(0,8).map(c=>c[0]);
+  // ---- stacked composition: top 10 categories + Other Issue by month ----
+  const stackCats = top10Categories.map(c=>c[0]).concat(otherIssueTotal>0 ? ['Other Issue'] : []);
   const series = {};
-  top8.forEach(cat=>{ series[cat] = monthsSorted.map(()=>0); });
+  stackCats.forEach(cat=>{ series[cat] = monthsSorted.map(()=>0); });
   datedTS.forEach(r=>{
-    if(!top8.includes(r.cat)) return;
     const key = r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
+    if(!latest12Keys.has(key)) return;
     const mi = monthsSorted.findIndex(m=>m.ym===key);
-    if(mi>=0) series[r.cat][mi]++;
+    if(mi<0) return;
+    const cat = top10Names.has(r.cat) ? r.cat : 'Other Issue';
+    if(series[cat]) series[cat][mi]++;
   });
   const stacked = { labels: monthsSorted.map(m=>m.label), series };
 
@@ -2069,7 +2087,7 @@ function computeAggregates(records){
     s.occ++;
     if(r.detentionMin!=null) s.det += r.detentionMin;
   });
-  const supSorted = [...supMap.entries()].sort((a,b)=>b[1].occ-a[1].occ).slice(0,10);
+  const supSorted = [...supMap.entries()].sort((a,b)=>b[1].occ-a[1].occ).slice(0,15);
   const supervisors = { labels: supSorted.map(s=>s[0]), occurrences: supSorted.map(s=>s[1].occ), detention: supSorted.map(s=>Math.round(s[1].det*10)/10) };
 
   // ---- top reasons (exact strings, excluding name-entry errors) ----
@@ -2112,10 +2130,9 @@ function computeAggregates(records){
 
   // ---- time of day ----
   const todBuckets = [
-    {label:'Night (00–06)', min:0, max:6},
-    {label:'Morning (06–12)', min:6, max:12},
-    {label:'Afternoon (12–18)', min:12, max:18},
-    {label:'Evening (18–24)', min:18, max:24}
+    {label:'Night (00–08)', min:0, max:8},
+    {label:'Day Shift (08–16)', min:8, max:16},
+    {label:'Evening Shift (16–24)', min:16, max:24}
   ];
   const todVals = todBuckets.map(()=>0);
   withCat.forEach(r=>{
@@ -2196,7 +2213,7 @@ function computeAggregates(records){
     det: r.detentionMin
   }));
 
-  const rangeLabel = monthly.labels.length ? (monthly.labels[0] + ' → ' + monthly.labels[monthly.labels.length-1]) : '—';
+  const rangeLabel = monthly.labels.length ? ('LATEST 12 MONTHS · ' + monthly.labels[0] + ' → ' + monthly.labels[monthly.labels.length-1]) : '—';
 
   return { DATA: { kpis, monthly, categories, stacked, pf, supervisors, top_reasons, detention_buckets, trains, weekday, timeOfDay, actionBreakdown, stationBooked, table, dataQuality, rangeLabel }, LOG };
 }
@@ -2251,12 +2268,25 @@ function renderAll(DATA, LOG){
   });
 
   const c = DATA.categories;
-  document.getElementById('catNote').textContent = c.labels.length + ' categories, auto-classified from free-text reason logs';
+  document.getElementById('catNote').textContent = 'Top 10 issues + Other Issue; auto-classified from free-text reason logs';
   upsertChart('categoryBar', {
     type:'bar', data:{labels:c.labels, datasets:[{data:c.values, backgroundColor:c.labels.map((_,i)=>PALETTE[i%PALETTE.length])}]},
     options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}, title:{display:true, text:'All categories, ranked', color:'#8b93a0', font:{size:10.5}}},
+      plugins:{legend:{display:false}, title:{display:true, text:'Top 10 issues + Other Issue', color:'#8b93a0', font:{size:11}}},
       scales:{x:{grid:{color:'#232b35'}}, y:{grid:{display:false}, ticks:{font:{size:9.5}}}} }
+  });
+
+  const oi = DATA.otherIssues;
+  upsertChart('otherIssueChart', {
+    type:'bar',
+    data:{labels:oi.labels, datasets:[{data:oi.values, backgroundColor:oi.labels.map((_,i)=>PALETTE[(i+2)%PALETTE.length])}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        title:{display:true, text:'Other Issue — Detailed Breakdown', color:'#8b93a0', font:{size:11}}
+      },
+      scales:{x:{grid:{color:'#232b35'}}, y:{grid:{display:false}, ticks:{font:{size:9}}}}
+    }
   });
 
   const st = DATA.stacked;
@@ -2264,8 +2294,8 @@ function renderAll(DATA, LOG){
   upsertChart('stackedChart', {
     type:'bar', data:{ labels:st.labels, datasets:stCats.map((cat,i)=>({label:cat, data:st.series[cat], backgroundColor:PALETTE[i%PALETTE.length], stack:'s'})) },
     options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom', labels:{boxWidth:9, font:{size:9}, color:'#8b93a0'}}, title:{display:true, text:'Composition by month (top 8 categories)', color:'#8b93a0', font:{size:10.5}}},
-      scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#232b35'}}} }
+      plugins:{legend:{position:'bottom', labels:{boxWidth:9, font:{size:9}, color:'#8b93a0'}}, title:{display:true, text:'Composition by month — latest 12 months', color:'#8b93a0', font:{size:11}}},
+      scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9.5}}}, y:{stacked:true, grid:{color:'#232b35'}}} }
   });
 
   const wd = DATA.weekday;
@@ -2301,7 +2331,7 @@ function renderAll(DATA, LOG){
   const sup = DATA.supervisors;
   upsertChart('supChart', {
     type:'bar', data:{labels:sup.labels, datasets:[{data:sup.occurrences, backgroundColor:'#9b8cd9'}]},
-    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#232b35'}}, y:{grid:{display:false}, ticks:{font:{size:9.5}}}}}
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#232b35'}}, y:{grid:{display:false}, ticks:{font:{size:9}}}}}
   });
 
   const trs = DATA.top_reasons;
