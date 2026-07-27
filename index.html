@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -180,6 +180,54 @@ header{
   background:rgba(91,155,213,.1);
   border-color:var(--blue);
   color:#bcdcf7;
+}
+
+.period-bar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  background:var(--bg-panel);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:12px 16px;
+  margin-bottom:18px;
+}
+
+.period-bar .lbl{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--text-mute);
+}
+
+.period-bar select,
+.period-bar input{
+  background:var(--bg-panel-alt);
+  border:1px solid var(--line);
+  color:var(--text);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  padding:8px 10px;
+  border-radius:2px;
+}
+
+.period-bar .custom-range{
+  display:none;
+  align-items:center;
+  gap:8px;
+}
+
+.period-bar .custom-range.active{
+  display:flex;
+}
+
+.period-bar .scope-note{
+  margin-left:auto;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11.5px;
+  color:var(--amber);
 }
 
 .kpi-row{
@@ -700,6 +748,29 @@ Connecting to sheet…
 <div class="banner error" id="errorBanner"></div>
 <div class="banner info" id="infoBanner"></div>
 
+<div class="period-bar">
+
+<span class="lbl">Period</span>
+
+<select id="periodSelect">
+<option value="3">Last 3 months</option>
+<option value="6">Last 6 months</option>
+<option value="12" selected>Last 12 months</option>
+<option value="24">Last 24 months</option>
+<option value="all">All time</option>
+<option value="custom">Custom range…</option>
+</select>
+
+<div class="custom-range" id="customRange">
+<input type="date" id="customFrom">
+<span class="lbl">to</span>
+<input type="date" id="customTo">
+</div>
+
+<span class="scope-note" id="scopeNote"></span>
+
+</div>
+
 
 <div id="mainContent" class="loading-dim">
 
@@ -719,8 +790,8 @@ Connecting to sheet…
 
 <h2>Occurrence Timeline</h2>
 
-<span class="note">
-latest 12 months · red node = peak load
+<span class="note" id="timelineNote">
+selected period · red node = peak load
 </span>
 
 </div>
@@ -1082,8 +1153,8 @@ Staff booked forward to down-line station
 
 <h2>Month × Category Matrix</h2>
 
-<span class="note">
-latest 12 months · darker amber = higher count
+<span class="note" id="matrixNote">
+selected period · darker amber = higher count
 </span>
 
 </div>
@@ -1235,23 +1306,11 @@ const SHEET_CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZmtqP1ohpGjbRJQh-bXvRhBYCFIZJiFhSybO_lH7H3IEuf7CHZOvASbizhTSi-MzdQzQ62s7Uu_g_/pub?output=csv&single=true";
 
 
-/*
-IMPORTANT:
-
-Keep this snapshot as your offline fallback.
-
-If Google Sheets cannot be accessed because the HTML file
-is opened directly using file://, the dashboard will still
-load the embedded data.
-*/
-
-const EMBEDDED_SNAPSHOT_CSV = `https://docs.google.com/spreadsheets/d/e/2PACX-1vSZmtqP1ohpGjbRJQh-bXvRhBYCFIZJiFhSybO_lH7H3IEuf7CHZOvASbizhTSi-MzdQzQ62s7Uu_g_/pub?output=csv&single=true`;
-
-
 /* ============================================================
 GLOBAL VARIABLES
 ============================================================ */
 
+let ALL_ROWS = [];
 let DATA = null;
 let ROWS = [];
 let charts = {};
@@ -1303,28 +1362,74 @@ function parseDate(value){
 
   if(!s) return null;
 
-  let d = new Date(s);
+  /*
+  Strip a trailing time component such as
+  "27/07/2026 14:35:00" or an ISO "2026-07-27T14:35:00".
+  We only care about the calendar date here.
+  */
 
-  if(!isNaN(d.getTime()))
-    return d;
+  s = s.split(/[T ]/)[0].trim();
+
+  if(!s) return null;
+
+  /*
+  Try DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY first, since the
+  register is maintained in Indian day-first format.
+  If one of the two numeric parts is clearly > 12 it must
+  be the day, whichever position it's in, so both orderings
+  are supported without silently overflowing into a
+  different year (which is what produced dates 12+ months
+  in the future previously).
+  */
 
   let m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
 
   if(m){
 
-    let day = Number(m[1]);
-    let month = Number(m[2])-1;
+    let a = Number(m[1]);
+    let b = Number(m[2]);
     let year = Number(m[3]);
 
     if(year < 100)
       year += 2000;
 
-    d = new Date(year,month,day);
+    let day, month;
 
-    if(!isNaN(d.getTime()))
+    if(a > 12 && b <= 12){
+      day = a;
+      month = b;
+    }
+    else if(b > 12 && a <= 12){
+      day = b;
+      month = a;
+    }
+    else{
+      // Ambiguous (both <= 12): default to day-first (DD/MM/YYYY)
+      day = a;
+      month = b;
+    }
+
+    let d = new Date(year, month-1, day);
+
+    // Guard against invalid day-in-month rollovers
+    // (e.g. day 31 in a 30-day month rolling into the next month)
+    if(
+      !isNaN(d.getTime()) &&
+      d.getFullYear() === year &&
+      d.getMonth() === month-1 &&
+      d.getDate() === day
+    )
       return d;
 
+    return null;
+
   }
+
+  // Try ISO / other native-parseable formats (e.g. YYYY-MM-DD)
+  let d2 = new Date(s);
+
+  if(!isNaN(d2.getTime()))
+    return d2;
 
   return null;
 
@@ -1559,10 +1664,107 @@ function parseCSV(text){
 
 
 /* ============================================================
+PERIOD SCOPE
+============================================================ */
+
+/*
+Reads the period selector and returns { from, to } Date bounds
+(either can be null, meaning unbounded) that should be applied
+to ALL_ROWS before processing. Also returns a human label used
+in section notes.
+*/
+
+function getPeriodScope(){
+
+  const sel =
+    document.getElementById('periodSelect').value;
+
+  const datedRows =
+    ALL_ROWS.filter(r => r.date instanceof Date && !isNaN(r.date));
+
+  const latestDate =
+    datedRows.length
+      ? new Date(Math.max(...datedRows.map(r=>r.date.getTime())))
+      : null;
+
+  if(sel === 'all' || !latestDate){
+
+    return {
+      from:null,
+      to:null,
+      months: sel === 'all' || sel === 'custom' ? null : Number(sel),
+      label:'All time'
+    };
+
+  }
+
+  if(sel === 'custom'){
+
+    const fromVal = document.getElementById('customFrom').value;
+    const toVal = document.getElementById('customTo').value;
+
+    const from = fromVal ? new Date(fromVal) : null;
+    const to = toVal ? new Date(toVal) : null;
+
+    return {
+      from,
+      to,
+      months:null,
+      label:
+        (fromVal || 'earliest') + ' → ' + (toVal || 'latest')
+    };
+
+  }
+
+  const monthsBack = Number(sel);
+
+  const end =
+    new Date(latestDate.getFullYear(), latestDate.getMonth(), 1);
+
+  const from =
+    new Date(end.getFullYear(), end.getMonth() - (monthsBack-1), 1);
+
+  const to =
+    new Date(latestDate.getFullYear(), latestDate.getMonth(), latestDate.getDate(), 23, 59, 59);
+
+  return {
+    from,
+    to,
+    months:monthsBack,
+    label:'Last ' + monthsBack + ' months'
+  };
+
+}
+
+
+function applyPeriodScope(scope){
+
+  if(!scope.from && !scope.to)
+    return ALL_ROWS.slice();
+
+  return ALL_ROWS.filter(r=>{
+
+    if(!(r.date instanceof Date) || isNaN(r.date))
+      return false;
+
+    if(scope.from && r.date < scope.from)
+      return false;
+
+    if(scope.to && r.date > scope.to)
+      return false;
+
+    return true;
+
+  });
+
+}
+
+
+/* ============================================================
 DATA PROCESSING
 ============================================================ */
 
-function processData(rows){
+function processData(rows, scope){
 
   ROWS = rows;
 
@@ -1576,9 +1778,22 @@ function processData(rows){
         )
       : null;
 
+  const earliestDate =
+    datedRows.length
+      ? new Date(
+          Math.min(...datedRows.map(r=>r.date.getTime()))
+        )
+      : null;
+
 
   /* ----------------------------------------------------------
-  Latest 12 months
+  Month window for the selected period.
+
+  If a fixed number of months was chosen, show exactly that
+  many trailing months (including zero-occurrence months).
+  If "All time" or a custom range was chosen, show every
+  calendar month actually present between the earliest and
+  latest date in the scoped rows.
   ---------------------------------------------------------- */
 
   const monthMap = new Map();
@@ -1625,23 +1840,9 @@ function processData(rows){
   });
 
 
-  const allMonths =
-    [...monthMap.values()]
-      .sort((a,b)=>a.key.localeCompare(b.key));
+  let windowMonths = [];
 
-
-  /*
-  IMPORTANT:
-
-  Latest 12 MONTHS means 12 calendar months ending
-  at the latest month in the data.
-
-  Even if one month has zero occurrences, it is included.
-  */
-
-  let latest12 = [];
-
-  if(latestDate){
+  if(scope && scope.months && latestDate){
 
     const end =
       new Date(
@@ -1650,7 +1851,7 @@ function processData(rows){
         1
       );
 
-    for(let i=11;i>=0;i--){
+    for(let i=scope.months-1;i>=0;i--){
 
       const d =
         new Date(
@@ -1667,7 +1868,7 @@ function processData(rows){
       const existing =
         monthMap.get(key);
 
-      latest12.push(
+      windowMonths.push(
         existing || {
           key:key,
           label:d.toLocaleString(
@@ -1686,16 +1887,56 @@ function processData(rows){
     }
 
   }
+  else if(earliestDate && latestDate){
+
+    // "All time" / custom range: every month actually spanned
+    let cursor =
+      new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
+
+    const end =
+      new Date(latestDate.getFullYear(), latestDate.getMonth(), 1);
+
+    while(cursor <= end){
+
+      const key =
+        cursor.getFullYear() +
+        '-' +
+        String(cursor.getMonth()+1).padStart(2,'0');
+
+      const existing =
+        monthMap.get(key);
+
+      windowMonths.push(
+        existing || {
+          key:key,
+          label:cursor.toLocaleString(
+            'en-US',
+            {
+              month:'short',
+              year:'numeric'
+            }
+          ),
+          occurrences:0,
+          detSum:0,
+          detCount:0
+        }
+      );
+
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+
+    }
+
+  }
 
 
-  const latest12Keys =
+  const windowKeys =
     new Set(
-      latest12.map(m=>m.key)
+      windowMonths.map(m=>m.key)
     );
 
 
   /* ----------------------------------------------------------
-  Category counts
+  Category counts (scoped to selected period)
   ---------------------------------------------------------- */
 
   const catMap = new Map();
@@ -1783,7 +2024,7 @@ function processData(rows){
   compositionCategories.forEach(cat=>{
 
     compositionSeries[cat] =
-      latest12.map(()=>0);
+      windowMonths.map(()=>0);
 
   });
 
@@ -1799,12 +2040,12 @@ function processData(rows){
       String(r.date.getMonth()+1).padStart(2,'0');
 
 
-    if(!latest12Keys.has(key))
+    if(!windowKeys.has(key))
       return;
 
 
     const monthIndex =
-      latest12.findIndex(
+      windowMonths.findIndex(
         m=>m.key===key
       );
 
@@ -2190,8 +2431,9 @@ function processData(rows){
     rows:rows,
 
     latestDate:latestDate,
+    earliestDate:earliestDate,
 
-    months:latest12,
+    months:windowMonths,
 
     categories:{
       labels:categoryLabels,
@@ -2202,7 +2444,7 @@ function processData(rows){
 
     stacked:{
       labels:
-        latest12.map(m=>m.label),
+        windowMonths.map(m=>m.label),
 
       series:
         compositionSeries
@@ -2344,7 +2586,7 @@ const commonScales = {
 RENDER DASHBOARD
 ============================================================ */
 
-function renderDashboard(){
+function renderDashboard(scope){
 
   if(!DATA)
     return;
@@ -2358,15 +2600,35 @@ function renderDashboard(){
   Range
   ---------------------------------------------------------- */
 
+  const scopeLabel =
+    (scope && scope.label) || '';
+
   if(months.length){
 
     document.getElementById('rangeLabel').textContent =
-      'LATEST 12 MONTHS · ' +
+      scopeLabel.toUpperCase() +
+      ' · ' +
       months[0].label +
       ' → ' +
       months[months.length-1].label;
 
   }
+  else{
+
+    document.getElementById('rangeLabel').textContent =
+      scopeLabel.toUpperCase() ||
+      'NO DATA';
+
+  }
+
+  document.getElementById('scopeNote').textContent =
+    DATA.rows.length + ' records in scope';
+
+  document.getElementById('timelineNote').textContent =
+    scopeLabel + ' · red node = peak load';
+
+  document.getElementById('matrixNote').textContent =
+    scopeLabel + ' · darker amber = higher count';
 
 
   /* ----------------------------------------------------------
@@ -2375,10 +2637,6 @@ function renderDashboard(){
 
   const total =
     DATA.rows.length;
-
-
-  const datedRows =
-    DATA.rows.filter(r=>r.date);
 
 
   const detentionRows =
@@ -2429,11 +2687,11 @@ function renderDashboard(){
     <div class="kpi">
       <div class="lbl">Total Occurrences</div>
       <div class="val">${total}</div>
-      <div class="sub">All register entries</div>
+      <div class="sub">Records in selected period</div>
     </div>
 
     <div class="kpi warn">
-      <div class="lbl">Latest 12 Months</div>
+      <div class="lbl">${escapeHTML(scopeLabel)}</div>
       <div class="val">${months.reduce((s,m)=>s+m.occurrences,0)}</div>
       <div class="sub">Current dashboard window</div>
     </div>
@@ -2912,7 +3170,7 @@ function renderDashboard(){
             display:true,
 
             text:
-              'Composition by Month — Latest 12 Months',
+              'Composition by Month — ' + scopeLabel,
 
             color:'#8b93a0',
 
@@ -4075,7 +4333,8 @@ async function fetchGoogleSheet(){
 
 
 /* ============================================================
-LOAD DATA
+LOAD DATA (fetches from the sheet, then applies the
+current period selection)
 ============================================================ */
 
 async function loadData(){
@@ -4119,9 +4378,9 @@ async function loadData(){
       );
 
 
-    processData(rows);
+    ALL_ROWS = rows;
 
-    renderDashboard();
+    applyScopeAndRender();
 
 
     syncStatus.textContent =
@@ -4149,82 +4408,16 @@ async function loadData(){
 
     console.error(error);
 
+    syncStatus.textContent =
+      'Data load failed';
 
-    /*
-    IMPORTANT FIX:
-
-    If live Google Sheets fails, load
-    the embedded snapshot instead.
-
-    The previous version could fail here because
-    DATA was undefined before renderDashboard().
-    */
-
-    try{
-
-      if(
-        !EMBEDDED_SNAPSHOT_CSV ||
-        EMBEDDED_SNAPSHOT_CSV.includes(
-          'PASTE_YOUR_EXISTING'
-        )
-      ){
-
-        throw new Error(
-          'No embedded offline snapshot available.'
-        );
-
-      }
-
-
-      const rows =
-        parseCSV(
-          EMBEDDED_SNAPSHOT_CSV
-        );
-
-
-      if(!rows.length)
-        throw new Error(
-          'Offline snapshot contains no usable records.'
-        );
-
-
-      processData(rows);
-
-      renderDashboard();
-
-
-      syncStatus.textContent =
-        'Live sync failed · Offline snapshot loaded';
-
-
-      setError(
-        'Could not refresh Google Sheets. Offline snapshot loaded instead.\\n\\n' +
-        'Reason: ' +
-        error.message
-      );
-
-    }
-    catch(snapshotError){
-
-      console.error(
-        snapshotError
-      );
-
-
-      syncStatus.textContent =
-        'Data load failed';
-
-
-      setError(
-        'Dashboard could not load data.\\n\\n' +
-        'Google Sheet error: ' +
-        error.message +
-        '\\n\\n' +
-        'Offline snapshot error: ' +
-        snapshotError.message
-      );
-
-    }
+    setError(
+      'Dashboard could not load data from the Google Sheet.\\n\\n' +
+      'Reason: ' + error.message +
+      '\\n\\nCheck that the sheet is published to the web ' +
+      '(File → Share → Publish to web → CSV) and that the ' +
+      'link is reachable, then click Refresh Data.'
+    );
 
   }
   finally{
@@ -4233,6 +4426,27 @@ async function loadData(){
       false;
 
   }
+
+}
+
+
+/* ============================================================
+Re-run processing/rendering against the currently
+selected period without re-fetching the sheet.
+============================================================ */
+
+function applyScopeAndRender(){
+
+  if(!ALL_ROWS.length)
+    return;
+
+  const scope = getPeriodScope();
+
+  const scopedRows = applyPeriodScope(scope);
+
+  processData(scopedRows, scope);
+
+  renderDashboard(scope);
 
 }
 
@@ -4270,6 +4484,45 @@ document.getElementById(
 ).addEventListener(
   'input',
   renderLog
+);
+
+
+document.getElementById(
+  'periodSelect'
+).addEventListener(
+  'change',
+  function(){
+
+    const isCustom =
+      this.value === 'custom';
+
+    document.getElementById(
+      'customRange'
+    ).classList.toggle(
+      'active',
+      isCustom
+    );
+
+    if(!isCustom)
+      applyScopeAndRender();
+
+  }
+);
+
+
+document.getElementById(
+  'customFrom'
+).addEventListener(
+  'change',
+  applyScopeAndRender
+);
+
+
+document.getElementById(
+  'customTo'
+).addEventListener(
+  'change',
+  applyScopeAndRender
 );
 
 
