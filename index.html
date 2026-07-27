@@ -1464,7 +1464,8 @@ function parseTime(value){
 
 
 /* ------------------------------------------------------------
-Detention parser
+Detention parser (used only if the sheet has an explicit
+"Detention Time" column)
 ------------------------------------------------------------ */
 
 function detentionMinutes(value){
@@ -1496,6 +1497,70 @@ function detentionMinutes(value){
   let n = Number(s);
 
   return isNaN(n) ? null : n;
+
+}
+
+
+/* ------------------------------------------------------------
+Clock-time-to-minutes helper (handles "18:35", "2:05",
+and the odd "09;55" semicolon typo seen in the register).
+Returns minutes since midnight (0-1439), or null.
+------------------------------------------------------------ */
+
+function timeToMinutes(value){
+
+  let s = clean(value);
+
+  if(!s) return null;
+
+  s = s.replace(/;/g,':');
+
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+
+  if(!m) return null;
+
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+
+  if(h > 23 || min > 59)
+    return null;
+
+  return h*60 + min;
+
+}
+
+
+/* ------------------------------------------------------------
+Derive detention (excess halt time) from advised vs actual
+arrival/departure clock times when there is no explicit
+"Detention Time" column in the sheet. Handles halts that
+cross midnight (e.g. advised 21:50, actual arrival 02:38
+the next day).
+
+detention = actual halt duration - scheduled halt duration,
+floored at 0 (a train that made up time isn't a negative
+detention).
+------------------------------------------------------------ */
+
+function derivedDetentionMinutes(advArr, advDep, actArr, actDep){
+
+  const advArrM = timeToMinutes(advArr);
+  const advDepM = timeToMinutes(advDep);
+  const actArrM = timeToMinutes(actArr);
+  const actDepM = timeToMinutes(actDep);
+
+  if(
+    advArrM === null || advDepM === null ||
+    actArrM === null || actDepM === null
+  )
+    return null;
+
+  const scheduledHalt = (advDepM - advArrM + 1440) % 1440;
+  const actualHalt = (actDepM - actArrM + 1440) % 1440;
+
+  const extra = actualHalt - scheduledHalt;
+
+  return extra > 0 ? extra : 0;
 
 }
 
@@ -1606,10 +1671,33 @@ function normalizeRow(r){
 
   const actArr = parseTime(r['Act Arr']);
 
-  const detention =
-    detentionMinutes(
-      r['Detention Time']
-    );
+  /*
+  Detention: use an explicit "Detention Time" column if the
+  sheet provides one; otherwise derive it as the excess halt
+  time (actual halt minus scheduled halt) from the advised
+  and actual arrival/departure clock times. Most registers
+  like this one don't have a raw detention column at all.
+  */
+
+  const hasDetentionColumn =
+    clean(r['Detention Time']) !== '';
+
+  let detention =
+    hasDetentionColumn
+      ? detentionMinutes(r['Detention Time'])
+      : null;
+
+  if(detention === null){
+
+    detention =
+      derivedDetentionMinutes(
+        r['Adv Arr'],
+        r['Adv Dep'],
+        r['Act Arr'],
+        r['Act Dep']
+      );
+
+  }
 
   return {
 
@@ -1627,7 +1715,7 @@ function normalizeRow(r){
 
     actArrHour: actArr,
 
-    cwc: clean(r['CWC No.']),
+    cwc: clean(r['CWC No.'] ?? r['CWC No']),
     supervisor: clean(r['Supervisor']),
 
     reason: clean(r['Reasons']),
