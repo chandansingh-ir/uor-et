@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unusual Occurrence Control Board — Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.5.4/papaparse.min.js"></script>
+<style>
+  :root, [data-theme="dark"]{
+    --bg-base:#0f172a;
+    --bg-panel:#1e293b;
+    --bg-panel-alt:#0f172a;
+    --line:#334155;
+    --line-soft:#1e293b;
+    --amber:#38bdf8;
+    --amber-dim:#0284c7;
+    --red:#f87171;
+    --green:#34d399;
+    --blue:#60a5fa;
+    --violet:#a78bfa;
+    --text:#f8fafc;
+    --text-mute:#94a3b8;
+    --text-dim:#64748b;
+    --card-shadow:0 1px 3px 0 rgba(0,0,0,0.3);
+    --input-bg:#0f172a;
+    --input-border:#334155;
+    --table-head-bg:#0f172a;
+    --tag-bg:rgba(56,189,248,0.15);
+    --tag-color:#38bdf8;
+    --tag-border:rgba(56,189,248,0.3);
+    --tab-bg:#0f172a;
+    --tab-active-bg:#1e293b;
+    --tab-active-color:#38bdf8;
+    --banner-err-bg:rgba(239,68,68,0.15);
+    --banner-err-border:rgba(239,68,68,0.4);
+    --banner-err-color:#fca5a5;
+    --banner-info-bg:rgba(56,189,248,0.15);
+    --banner-info-border:rgba(56,189,248,0.4);
+    --banner-info-color:#7dd3fc;
+    --track-line:linear-gradient(90deg, #0284c7, #38bdf8, #0284c7);
+  }
+
+  [data-theme="light"]{
+    --bg-base:#f8fafc;
+    --bg-panel:#ffffff;
+    --bg-panel-alt:#f1f5f9;
+    --line:#e2e8f0;
+    --line-soft:#cbd5e1;
+    --amber:#2563eb;
+    --amber-dim:#1d4ed8;
+    --red:#ef4444;
+    --green:#10b981;
+    --blue:#3b82f6;
+    --violet:#8b5cf6;
+    --text:#0f172a;
+    --text-mute:#475569;
+    --text-dim:#64748b;
+    --card-shadow:0 1px 3px 0 rgb(0 0 0 / 0.05);
+    --input-bg:#ffffff;
+    --input-border:#cbd5e1;
+    --table-head-bg:#f8fafc;
+    --tag-bg:#eff6ff;
+    --tag-color:#2563eb;
+    --tag-border:#bfdbfe;
+    --tab-bg:#f1f5f9;
+    --tab-active-bg:#ffffff;
+    --tab-active-color:#2563eb;
+    --banner-err-bg:#fef2f2;
+    --banner-err-border:#fca5a5;
+    --banner-err-color:#991b1b;
+    --banner-info-bg:#eff6ff;
+    --banner-info-border:#bfdbfe;
+    --banner-info-color:#1e40af;
+    --track-line:linear-gradient(90deg, #93c5fd, #2563eb, #93c5fd);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg-base);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Oswald',sans-serif;}
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 28px 80px;}
+
+  header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--amber);
+    padding-bottom:18px;margin-bottom:20px;flex-wrap:wrap;gap:16px;
+  }
+  .h-left .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;
+    color:var(--amber);text-transform:uppercase;margin-bottom:8px;display:flex;gap:10px;align-items:center;
+    font-weight:600;
+  }
+  .h-left .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px rgba(56,189,248,.5);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .h-left h1{
+    font-family:'Oswald',sans-serif;font-weight:700;font-size:32px;letter-spacing:.01em;
+    margin:0;text-transform:uppercase;color:var(--text);
+  }
+  .h-left p{margin:6px 0 0;color:var(--text-mute);font-size:13.5px;max-width:620px;line-height:1.5;}
+  .h-right{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-mute);}
+  .h-right .range{color:var(--amber);font-size:15px;font-weight:700;margin-bottom:10px;}
+  
+  .time-select-wrap{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--bg-panel);padding:6px 12px;border:1px solid var(--line);border-radius:8px;
+    box-shadow:var(--card-shadow);
+  }
+  .time-select-wrap label{font-size:11px;color:var(--text-mute);font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .time-select-wrap select{
+    background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding:6px 12px;
+    border-radius:6px;cursor:pointer;outline:none;
+  }
+  .time-select-wrap select:focus{border-color:var(--amber);}
+
+  .theme-toggle-btn{
+    background:var(--bg-panel);border:1px solid var(--line);color:var(--text);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding:8px 14px;
+    border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+    box-shadow:var(--card-shadow);transition:all .15s ease;
+  }
+  .theme-toggle-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+  #refreshBtn{
+    background:var(--amber);color:#ffffff;border:none;font-family:'IBM Plex Mono',monospace;
+    font-weight:600;font-size:12px;letter-spacing:.06em;padding:10px 18px;border-radius:8px;
+    cursor:pointer;text-transform:uppercase;box-shadow:0 1px 3px rgba(37,99,235,.3);transition:all .15s ease;
+  }
+  #refreshBtn:hover{background:var(--amber-dim);transform:translateY(-1px);}
+  #refreshBtn:disabled{opacity:.55;cursor:wait;}
+  #syncStatus{margin-top:8px;color:var(--text-dim);font-size:11px;}
+
+  .banner{
+    display:none;padding:12px 16px;border-radius:8px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;
+    margin-bottom:20px;border:1px solid;
+  }
+  .banner.error{background:var(--banner-err-bg);border-color:var(--banner-err-border);color:var(--banner-err-color);}
+  .banner.info{background:var(--banner-info-bg);border-color:var(--banner-info-border);color:var(--banner-info-color);}
+
+  .kpi-row{
+    display:grid;grid-template-columns:repeat(6,1fr);gap:12px;
+    background:transparent;border:none;margin-bottom:26px;
+    border-radius:0;overflow:visible;
+  }
+  .kpi{
+    background:var(--bg-panel);padding:18px 16px;position:relative;
+    border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--card-shadow);
+  }
+  .kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-mute);margin-bottom:8px;font-weight:600;}
+  .kpi .val{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;color:var(--text);line-height:1;}
+  .kpi .sub{font-size:11px;color:var(--text-dim);margin-top:6px;}
+  .kpi.warn .val{color:var(--amber);}
+  .kpi.crit .val{color:var(--red);}
+  .kpi.good .val{color:var(--green);}
+  .kpi::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:var(--amber);border-radius:12px 12px 0 0;}
+  .kpi.warn::before{background:var(--amber);}
+  .kpi.crit::before{background:var(--red);}
+  .kpi.good::before{background:var(--green);}
+
+  .section{margin-bottom:30px;}
+  .section-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}
+  .section-head .idx{font-family:'IBM Plex Mono',monospace;color:var(--amber);font-size:12px;font-weight:700;}
+  .section-head h2{font-family:'Oswald',sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:.05em;margin:0;color:var(--text);font-weight:600;}
+  .section-head .note{color:var(--text-dim);font-size:11.5px;margin-left:auto;font-family:'IBM Plex Mono',monospace;}
+
+  .panel{
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:12px;padding:20px;
+    box-shadow:var(--card-shadow);
+  }
+  .grid-2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  @media(max-width:980px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}.kpi-row{grid-template-columns:repeat(3,1fr);}}
+
+  canvas{max-width:100%;}
+
+  .track-wrap{position:relative;padding:34px 10px 10px;}
+  .track-line{
+    position:absolute;top:52px;left:24px;right:24px;height:2px;
+    background:var(--track-line);
+  }
+  .stations{display:flex;justify-content:space-between;position:relative;z-index:2;overflow-x:auto;}
+  .station{display:flex;flex-direction:column;align-items:center;flex:1;min-width:60px;position:relative;}
+  .station .peak-badge{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);margin-bottom:4px;height:12px;font-weight:700;
+  }
+  .station .node{
+    width:14px;height:14px;border-radius:50%;background:var(--bg-panel);border:2px solid var(--amber);
+    margin-top:4px;position:relative;z-index:3;
+  }
+  .station.peak .node{background:var(--red);border-color:var(--red);box-shadow:0 0 10px rgba(239,68,68,.5);}
+  .station .val{font-family:'IBM Plex Mono',monospace;font-size:13px;margin-top:8px;color:var(--text);font-weight:600;}
+  .station .lbl{font-size:10px;color:var(--text-mute);margin-top:3px;text-transform:uppercase;letter-spacing:.03em;}
+
+  .rank-list{list-style:none;margin:0;padding:0;}
+  .rank-list li{
+    display:grid;grid-template-columns:26px 1fr 44px;gap:10px;align-items:center;
+    padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;
+  }
+  .rank-list li:last-child{border-bottom:none;}
+  .rank-list .n{font-family:'IBM Plex Mono',monospace;color:var(--amber);font-size:11px;font-weight:600;}
+  .rank-list .bar-bg{height:6px;background:var(--bg-panel-alt);border-radius:3px;overflow:hidden;margin-top:4px;}
+  .rank-list .bar-fill{height:100%;background:var(--amber);border-radius:3px;}
+  .rank-list .bar-fill.alt{background:var(--blue);border-radius:3px;}
+  .rank-list .cnt{font-family:'IBM Plex Mono',monospace;text-align:right;color:var(--text-mute);font-size:12px;font-weight:600;}
+  .rank-list .txt{color:var(--text);font-weight:500;}
+
+  /* Category breakdown tabs */
+  .cat-tab-bar{display:flex;gap:4px;margin-bottom:14px;background:var(--tab-bg);padding:4px;border-radius:8px;border:none;}
+  .cat-tab-btn{
+    background:transparent;color:var(--text-mute);border:none;
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;padding:6px 16px;
+    border-radius:6px;cursor:pointer;transition:all .15s ease;
+  }
+  .cat-tab-btn:hover{color:var(--text);}
+  .cat-tab-btn.active{
+    background:var(--tab-active-bg);color:var(--tab-active-color);box-shadow:var(--card-shadow);font-weight:700;
+  }
+
+  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .filters select, .filters input{
+    background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 12px;border-radius:6px;
+  }
+  .filters input{flex:1;min-width:180px;}
+  .filters .count{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-mute);}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  thead th{
+    text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--text-mute);padding:10px 12px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--table-head-bg);font-weight:700;
+  }
+  tbody td{padding:8px 12px;border-bottom:1px solid var(--line-soft);color:var(--text);vertical-align:top;}
+  tbody tr:hover{background:var(--bg-panel-alt);}
+  .tag{
+    display:inline-block;padding:2px 8px;border-radius:4px;font-size:10.5px;font-family:'IBM Plex Mono',monospace;
+    background:var(--tag-bg);color:var(--tag-color);border:1px solid var(--tag-border);white-space:nowrap;font-weight:600;
+  }
+  .det-hi{color:var(--red);font-weight:700;}
+  .scroll-table{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:8px;}
+
+  .matrix-scroll{overflow-x:auto;}
+  .matrix-table{font-size:11px;white-space:nowrap;}
+  .matrix-table th, .matrix-table td{padding:6px 9px;}
+  .matrix-table th.cat-col{writing-mode:vertical-rl;transform:rotate(180deg);text-align:left;height:130px;font-size:10px;}
+  .matrix-table td.num{font-family:'IBM Plex Mono',monospace;text-align:center;color:var(--text-mute);}
+  .matrix-table td.num.hi{color:#ffffff;background:var(--amber);font-weight:700;border-radius:4px;}
+  .matrix-table td.num.mid{color:var(--text);background:rgba(56,189,248,.15);border-radius:2px;}
+  .matrix-table td.rowlabel{font-family:'IBM Plex Mono',monospace;color:var(--text);position:sticky;left:0;background:var(--bg-panel);font-weight:600;}
+
+  .dq-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
+  .dq-item{background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:var(--card-shadow);}
+  .dq-item .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--amber);}
+  .dq-item .t{font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.4;}
+  @media(max-width:980px){.dq-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(min-width:981px) and (max-width:1240px){.dq-grid{grid-template-columns:repeat(3,1fr);}}
+
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--text-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .loading-dim{opacity:.4;pointer-events:none;transition:opacity .2s;}
+</style>
+</head>
+<body data-theme="dark">
+<div class="wrap">
+
+  <header>
+    <div class="h-left">
+      <div class="eyebrow"><span class="dot"></span> Coaching Depot &nbsp;·&nbsp; Live Log Analysis</div>
+      <h1>Unusual Occurrence Control Board</h1>
+      <p>Consolidated, auto-cleaned view of train detentions and coach faults — pulled live from the depot's Google Sheet register, re-classified and cross-checked by platform, supervisor and rolling stock on every refresh.</p>
+    </div>
+    <div class="h-right">
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <div class="time-select-wrap">
+          <label for="timeRangeSelect">Timeframe:</label>
+          <select id="timeRangeSelect">
+            <option value="current">Current Month</option>
+            <option value="3m">Last 3 Months</option>
+            <option value="6m">Last 6 Months</option>
+            <option value="12m" selected>Last 12 Months</option>
+            <option value="all">All Data</option>
+          </select>
+        </div>
+        <button id="themeToggleBtn" class="theme-toggle-btn" title="Toggle Light / Dark Mode">
+          <span id="themeIcon">🌙</span> <span id="themeLabel">Dark Mode</span>
+        </button>
+      </div>
+      <div class="range" id="rangeLabel">LOADING…</div>
+      <button id="refreshBtn">↻ Refresh Data</button>
+      <div id="syncStatus">Connecting to sheet…</div>
+    </div>
+  </header>
+
+  <div class="banner error" id="errorBanner"></div>
+  <div class="banner info" id="infoBanner"></div>
+
+  <div id="mainContent" class="loading-dim">
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- 01 MONTHLY TREND -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">01</span><h2>Occurrence Timeline</h2>
+      <span class="note">station = month · red node = peak load</span>
+    </div>
+    <div class="panel">
+      <div class="track-wrap">
+        <div class="track-line"></div>
+        <div class="stations" id="stations"></div>
+      </div>
+      <div style="height:230px;margin-top:10px;"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 02 FAULT CATEGORIES -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">02</span><h2>Fault Category Breakdown</h2>
+      <span class="note" id="catNote">auto-classified from free-text reason logs</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="cat-tab-bar">
+          <button id="tabTop10Btn" class="cat-tab-btn active">Top 10 Categories</button>
+          <button id="tabOthersBtn" class="cat-tab-btn">Others Tab (<span id="othersBadgeCount">0</span>)</button>
+        </div>
+        
+        <div id="top10TabContent" style="height:310px;">
+          <canvas id="categoryBar"></canvas>
+        </div>
+        
+        <div id="othersTabContent" style="display:none; height:310px; overflow-y:auto; padding-right:4px;">
+          <div style="font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;" id="othersTabHeading">Categories Outside Top 10</div>
+          <ul class="rank-list" id="othersCategoryList"></ul>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="height:340px;"><canvas id="stackedChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 TEMPORAL PATTERNS -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">03</span><h2>Temporal Patterns</h2>
+      <span class="note">when faults get logged</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Occurrences by day of week</div>
+        <div style="height:250px;"><canvas id="weekdayChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Occurrences by time of day (actual arrival)</div>
+        <div style="height:250px;"><canvas id="todChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 HOTSPOTS -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">04</span><h2>Operational Hotspots</h2>
+      <span class="note">where &amp; who</span>
+    </div>
+    <div class="grid-3">
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Platform-wise occurrences</div>
+        <div style="height:250px;"><canvas id="pfChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Repeat-offender rakes (train no.)</div>
+        <div style="height:250px;"><canvas id="trainChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Detention time distribution</div>
+        <div style="height:250px;"><canvas id="detChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 SUPERVISOR + TOP REASONS -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">05</span><h2>Supervisor Load &amp; Recurring Reasons</h2>
+      <span class="note">top 10 supervisors · top 12 exact reason strings</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Supervisor-wise occurrences handled</div>
+        <div style="height:280px;"><canvas id="supChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Most frequently logged exact reasons</div>
+        <ul class="rank-list" id="topReasonsList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 06 RESOLUTION & FOLLOW-UP -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">06</span><h2>Resolution &amp; Follow-up</h2>
+      <span class="note">how faults got closed out</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Action-taken breakdown</div>
+        <div style="height:260px;"><canvas id="actionChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div style="font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Staff booked forward to down-line station <span style="color:var(--text-dim);">(unresolved on-spot)</span></div>
+        <ul class="rank-list" id="stationList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 07 MONTH x CATEGORY MATRIX -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">07</span><h2>Month × Category Matrix</h2>
+      <span class="note">darker amber = higher count in that cell</span>
+    </div>
+    <div class="panel matrix-scroll">
+      <table class="matrix-table" id="matrixTable"></table>
+    </div>
+  </div>
+
+  <!-- 08 DATA QUALITY -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">08</span><h2>Data Quality &amp; Coverage</h2>
+      <span class="note">what to fix at source in the register</span>
+    </div>
+    <div class="panel">
+      <div class="dq-grid" id="dqGrid"></div>
+    </div>
+  </div>
+
+  <!-- 09 DRILLDOWN LOG -->
+  <div class="section">
+    <div class="section-head">
+      <span class="idx">09</span><h2>Occurrence Log — Drilldown</h2>
+      <span class="note">filter &amp; search the full register</span>
+    </div>
+    <div class="panel">
+      <div class="filters">
+        <select id="fMonth"><option value="">All months</option></select>
+        <select id="fCategory"><option value="">All categories</option></select>
+        <input id="fSearch" type="text" placeholder="Search reason text, train no, supervisor…">
+        <span class="count" id="fCount"></span>
+      </div>
+      <div class="scroll-table">
+        <table id="logTable">
+          <thead><tr>
+            <th>Date</th><th>Train</th><th>PF</th><th>Category</th><th>Reason</th><th>Supervisor</th><th>Action Taken</th><th>Detention</th>
+          </tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /mainContent -->
+
+  <footer>
+    <div>Source: <span class="mono">Google Sheet (published CSV)</span> — refreshed live in your browser, no server involved.</div>
+    <div id="loggedNote"></div>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSZmtqP1ohpGjbRJQh-bXvRhBYCFIZJiFhSybO_lH7H3IEuf7CHZOvASbizhTSi-MzdQzQ62s7Uu_g_/pub?output=csv&single=true";
+const SNAPSHOT_DATE = "25 Jul 2026";
+let ALL_PARSED_RECORDS = [];
+
+function isDarkMode(){
+  return (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+}
+function getGridColor(){
+  return isDarkMode() ? '#334155' : '#e2e8f0';
+}
+function getTextColor(){
+  return isDarkMode() ? '#94a3b8' : '#64748b';
+}
+function getPalette(){
+  return isDarkMode() ? 
+    ['#38bdf8','#818cf8','#34d399','#fbbf24','#f87171','#c084fc','#2dd4bf','#f472b6','#a3e635','#94a3b8','#e2e8f0'] :
+    ['#2563eb','#06b6d4','#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#0d9488','#3b82f6','#ec4899','#84cc16','#64748b'];
+}
+
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = '#334155';
+const charts = {};
+function upsertChart(id, config){
+  if(charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+/* ============================================================
+   PARSING HELPERS
+   ============================================================ */
+function resolveHeaders(fields){
+  const find = (subs) => fields.find(f => subs.every(s => f.toLowerCase().includes(s))) || null;
+  return {
+    date: find(['date']),
+    train: find(['train']),
+    pf: fields.find(f=>f.trim().toLowerCase()==='pf') || find(['platform']),
+    advArr: find(['adv','arr']),
+    advDep: find(['adv','dep']),
+    actArr: find(['act','arr']),
+    actDep: find(['act','dep']),
+    cwc: find(['cwc']),
+    supervisor: find(['supervisor']),
+    reasons: find(['reason']),
+    action: find(['action']),
+    detention: find(['detention']),
+    remarks: find(['remark'])
+  };
+}
+
+function parseDate(raw){
+  if(raw==null) return null;
+  const s = String(raw).trim();
+  if(!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4,6})(\.\d+)?$/);
+  if(m){
+    const serial = parseFloat(s);
+    if(serial > 20000 && serial < 60000){
+      const epoch = Date.UTC(1899,11,30);
+      const d = new Date(epoch + serial*86400000);
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+    return null;
+  }
+  const d2 = new Date(s);
+  if(!isNaN(d2.getTime())) return new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+  return null;
+}
+
+function parseDetentionMinutes(raw){
+  if(raw==null) return null;
+  const s = String(raw).trim();
+  if(s==='' || s==='-' || s.toLowerCase()==='nan') return null;
+  if(/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  const parts = s.split(':').map(x=>parseFloat(x));
+  if(parts.some(isNaN)) return null;
+  if(parts.length===3){ const [h,mi,se]=parts; return h*60+mi+se/60; }
+  if(parts.length===2){ const [h,mi]=parts; return h*60+mi; }
+  return null;
+}
+
+function normalizePF(raw){
+  if(raw==null) return null;
+  let s = String(raw).trim();
+  if(s==='' || s==='-' || s.toLowerCase()==='nan') return null;
+  if(/^\d+\.0$/.test(s)) s = s.replace('.0','');
+  return s;
+}
+
+function parseHour(raw){
+  if(!raw) return null;
+  const s = String(raw).trim();
+  const m = s.match(/^(\d{1,2})/);
+  if(!m) return null;
+  const h = parseInt(m[1],10);
+  return isNaN(h) ? null : h;
+}
+
+function normName(s){ return (s||'').toLowerCase().replace(/[.\s]/g,''); }
+
+const CATEGORY_RULES = [
+  [/automatic\s*pressure\s*drop/i, 'Automatic Pressure Drop'],
+  [/air\s*spring/i, 'Air Spring Issue'],
+  [/spring/i, 'Spring Broken (Primary/Secondary)'],
+  [/fsds/i, 'FSDS (Fire/Smoke Detection)'],
+  [/not found any issue|no\s*(any\s*)?c\s*&?\s*w\s*issue|no issue found|false alarm/i, 'No Issue / False Alarm'],
+  [/fiba/i, 'FIBA Issue'],
+  [/\bbp\b|\bfp\b|\bar\b.*(pipe|hose)|air\s*hose|hose\s*pipe/i, 'BP/FP/AR Airhose & Pipe Issue'],
+  [/brake|bc\s*pipe/i, 'Brake System Issue'],
+  [/wheel|axle\s*box/i, 'Wheel / Axle Box Issue'],
+  [/cbc|coupl/i, 'CBC / Coupling Issue'],
+  [/door|vestibule/i, 'Door / Vestibule Issue'],
+  [/hanging|missing/i, 'Hanging / Missing Part'],
+  [/\bacp\b|alarm\s*chain/i, 'ACP (Alarm Chain Pulling)'],
+  [/sound|noise/i, 'Unusual Sound / Noise'],
+  [/clean|watering|pantry|catering|commercial/i, 'Cleaning / Watering / Commercial'],
+  [/isolat/i, 'Coach Isolated / Isolation'],
+  [/habd/i, 'HABD Alert'],
+  [/walkie|wireless|communication/i, 'Communication Issue (Staff)'],
+  [/security|theft|unauthoris|unauthoriz|\bsafety\b/i, 'Security / Safety Issue'],
+  [/earth|electrical|short\s*circuit/i, 'Electrical / Earthing Issue']
+];
+
+function classifyReason(reasonRaw, supNameSet){
+  const s = (reasonRaw||'').trim();
+  if(!s) return 'Not Recorded';
+  for(const [re,label] of CATEGORY_RULES){ if(re.test(s)) return label; }
+  if(supNameSet.has(normName(s))) return 'Unspecified (Name Entered)';
+  return 'Other / Uncategorized';
+}
+
+function classifyAction(actionRaw){
+  const s = (actionRaw||'').trim();
+  if(!s) return {label:'Not Recorded', station:null};
+  const low = s.toLowerCase();
+  const stMatch = s.match(/bk[d]?\.?\s*(?:upto|to)?\s*([A-Za-z]{2,6})\b/i);
+  const station = stMatch ? stMatch[1].toUpperCase() : null;
+  let label;
+  if(station) label = 'Staff Booked to Down-line Station';
+  else if(/isolat/.test(low)) label = 'Allowed in Isolated Condition';
+  else if(/working condition/.test(low)) label = 'Allowed in Working Condition';
+  else if(/same condition/.test(low)) label = 'Allowed in Same Condition';
+  else if(/permissible limit/.test(low)) label = 'Allowed to Permissible Limit';
+  else if(/^attended$/.test(low)) label = 'Attended (No Further Detail)';
+  else label = 'Other / Miscellaneous';
+  return {label, station};
+}
+
+const WEEKDAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function weekdayIdx(d){ const j = d.getDay(); return j===0?6:j-1; }
+
+/* ============================================================
+   BUILD RECORDS FROM RAW CSV ROWS
+   ============================================================ */
+function buildRecords(rawRows, H){
+  const out = [];
+  rawRows.forEach((r,idx)=>{
+    const dateRaw = H.date ? r[H.date] : '';
+    const trainRaw = H.train ? r[H.train] : '';
+    const reasonRaw0 = H.reasons ? (r[H.reasons]||'') : '';
+    if(!String(dateRaw||'').trim() && !String(trainRaw||'').trim() && !String(reasonRaw0||'').trim()) return;
+    out.push({
+      sr: idx+1,
+      date: parseDate(dateRaw),
+      dateRaw: (dateRaw||'').toString(),
+      train: (trainRaw||'').toString().trim(),
+      pf: normalizePF(H.pf ? r[H.pf] : ''),
+      actArr: H.actArr ? (r[H.actArr]||'').toString().trim() : '',
+      cwc: H.cwc ? (r[H.cwc]||'').toString().trim() : '',
+      supervisor: H.supervisor ? (r[H.supervisor]||'').toString().trim() : '',
+      reasonRaw: reasonRaw0.toString().trim(),
+      actionRaw: H.action ? (r[H.action]||'').toString().trim() : '',
+      detentionMin: parseDetentionMinutes(H.detention ? r[H.detention] : ''),
+      remarks: H.remarks ? (r[H.remarks]||'').toString().trim() : ''
+    });
+  });
+  return out;
+}
+
+/* ============================================================
+   FILTER RECORDS BY TIMEFRAME DROPDOWN
+   ============================================================ */
+function filterRecordsByTimeframe(allRecords, timeframe){
+  if(!allRecords || !allRecords.length) return { records: [], label: 'NO DATA' };
+  if(timeframe === 'all') return { records: allRecords, label: 'ALL TIME DATA' };
+
+  const now = new Date();
+  // Filter out dates that are invalid OR in the future relative to today (date > now)
+  const validDatedRecords = allRecords.filter(r => r.date instanceof Date && !isNaN(r.date.getTime()) && r.date <= now);
+  
+  // Fallback if all dates in dataset are in future or unparseable
+  const datedRecords = validDatedRecords.length ? validDatedRecords : allRecords.filter(r => r.date instanceof Date && !isNaN(r.date.getTime()));
+  if(!datedRecords.length) return { records: allRecords, label: 'ALL TIME DATA' };
+
+  // Find max valid date in dataset (must be <= now)
+  const maxRecordTime = Math.max(...datedRecords.map(r => r.date.getTime()));
+  const maxRecordDate = new Date(maxRecordTime);
+
+  // Determine anchor year and month from max valid record
+  const maxYear = maxRecordDate.getFullYear();
+  const maxMonth = maxRecordDate.getMonth();
+
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  if(timeframe === 'current'){
+    const filtered = allRecords.filter(r => {
+      if(!r.date) return false;
+      return r.date.getFullYear() === maxYear && r.date.getMonth() === maxMonth;
+    });
+    const label = `${monthNames[maxMonth]} ${maxYear} (Current Month)`;
+    return { records: filtered, label };
+  }
+
+  let monthsBack = 3;
+  if(timeframe === '3m') monthsBack = 3;
+  else if(timeframe === '6m') monthsBack = 6;
+  else if(timeframe === '12m') monthsBack = 12;
+
+  // Calendar month boundary calculation
+  const startDate = new Date(maxYear, maxMonth - monthsBack + 1, 1, 0, 0, 0, 0);
+  const endDate = new Date(maxYear, maxMonth + 1, 0, 23, 59, 59, 999);
+
+  const filtered = allRecords.filter(r => {
+    if(!r.date) return false;
+    return r.date >= startDate && r.date <= endDate;
+  });
+
+  const startLabel = `${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}`;
+  const endLabel = `${monthNames[maxMonth]} ${maxYear}`;
+  const label = `${startLabel} → ${endLabel} (${monthsBack} Months)`;
+
+  return { records: filtered, label };
+}
+
+/* ============================================================
+   AGGREGATE INTO DASHBOARD DATA
+   ============================================================ */
+function computeAggregates(records, rangeTextLabel){
+  const supNameSet = new Set(records.map(r=>normName(r.supervisor)).filter(Boolean));
+  const withCat = records.map(r=>{
+    const cat = classifyReason(r.reasonRaw, supNameSet);
+    const act = classifyAction(r.actionRaw);
+    return Object.assign({}, r, {cat, actionLabel:act.label, station:act.station});
+  });
+
+  const dated = withCat.filter(r=>r.date);
+  const nowGuard = new Date();
+  const datedTS = dated.filter(r=>r.date <= nowGuard);
+
+  // ---- monthly ----
+  const monthMap = new Map();
+  datedTS.forEach(r=>{
+    const key = r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
+    if(!monthMap.has(key)) monthMap.set(key, {label:r.date.toLocaleString('en-US',{month:'short'})+' '+r.date.getFullYear(), occurrences:0, detSum:0, detCount:0, ym:key});
+    const mo = monthMap.get(key);
+    mo.occurrences++;
+    if(r.detentionMin!=null){ mo.detSum += r.detentionMin; mo.detCount++; }
+  });
+  const monthsSorted = [...monthMap.values()].sort((a,b)=>a.ym.localeCompare(b.ym));
+  const monthly = {
+    labels: monthsSorted.map(m=>m.label),
+    occurrences: monthsSorted.map(m=>m.occurrences),
+    total_detention: monthsSorted.map(m=> m.detCount>0 ? Math.round(m.detSum*10)/10 : null),
+    avg_detention: monthsSorted.map(m=> m.detCount>0 ? Math.round((m.detSum/m.detCount)*10)/10 : null),
+    recorded_count: monthsSorted.map(m=>m.detCount)
+  };
+
+  // ---- categories (Top 10 + Others) ----
+  const catCount = new Map();
+  withCat.forEach(r=>{ catCount.set(r.cat, (catCount.get(r.cat)||0)+1); });
+  const catSorted = [...catCount.entries()].sort((a,b)=>b[1]-a[1]);
+  
+  const top10 = catSorted.slice(0, 10);
+  const othersList = catSorted.slice(10);
+  const othersSum = othersList.reduce((sum, item) => sum + item[1], 0);
+
+  const categories = {
+    top10Labels: top10.map(c=>c[0]),
+    top10Values: top10.map(c=>c[1]),
+    othersList: othersList.map(c=>({ label: c[0], count: c[1] })),
+    othersSum: othersSum,
+    totalCount: withCat.length,
+    totalCategories: catSorted.length
+  };
+
+  // ---- stacked (top 8 categories x month) ----
+  const top8 = catSorted.slice(0,8).map(c=>c[0]);
+  const series = {};
+  top8.forEach(cat=>{ series[cat] = monthsSorted.map(()=>0); });
+  datedTS.forEach(r=>{
+    if(!top8.includes(r.cat)) return;
+    const key = r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
+    const mi = monthsSorted.findIndex(m=>m.ym===key);
+    if(mi>=0) series[r.cat][mi]++;
+  });
+  const stacked = { labels: monthsSorted.map(m=>m.label), series };
+
+  // ---- pf ----
+  const pfCount = new Map();
+  withCat.forEach(r=>{ if(r.pf) pfCount.set(r.pf, (pfCount.get(r.pf)||0)+1); });
+  const pfSorted = [...pfCount.entries()].sort((a,b)=>b[1]-a[1]);
+  const pf = { labels: pfSorted.map(c=>c[0]), values: pfSorted.map(c=>c[1]) };
+
+  // ---- supervisors ----
+  const supMap = new Map();
+  withCat.forEach(r=>{
+    if(!r.supervisor) return;
+    if(!supMap.has(r.supervisor)) supMap.set(r.supervisor, {occ:0, det:0});
+    const s = supMap.get(r.supervisor);
+    s.occ++;
+    if(r.detentionMin!=null) s.det += r.detentionMin;
+  });
+  const supSorted = [...supMap.entries()].sort((a,b)=>b[1].occ-a[1].occ).slice(0,10);
+  const supervisors = { labels: supSorted.map(s=>s[0]), occurrences: supSorted.map(s=>s[1].occ), detention: supSorted.map(s=>Math.round(s[1].det*10)/10) };
+
+  // ---- top reasons ----
+  const reasonMap = new Map();
+  withCat.forEach(r=>{
+    if(!r.reasonRaw || r.cat==='Unspecified (Name Entered)') return;
+    reasonMap.set(r.reasonRaw, (reasonMap.get(r.reasonRaw)||0)+1);
+  });
+  const reasonSorted = [...reasonMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const top_reasons = { labels: reasonSorted.map(r=>r[0]), values: reasonSorted.map(r=>r[1]) };
+
+  // ---- detention buckets ----
+  const bucketLabels = ['0 min','1-5 min','6-15 min','16-30 min','31-60 min','60+ min'];
+  const bucketVals = [0,0,0,0,0,0];
+  let highDetCount = 0;
+  withCat.forEach(r=>{
+    if(r.detentionMin==null) return;
+    const v = r.detentionMin;
+    if(v>30) highDetCount++;
+    if(v===0) bucketVals[0]++;
+    else if(v<=5) bucketVals[1]++;
+    else if(v<=15) bucketVals[2]++;
+    else if(v<=30) bucketVals[3]++;
+    else if(v<=60) bucketVals[4]++;
+    else bucketVals[5]++;
+  });
+  const detention_buckets = { labels: bucketLabels, values: bucketVals };
+
+  // ---- trains ----
+  const trainMap = new Map();
+  withCat.forEach(r=>{ if(r.train) trainMap.set(r.train, (trainMap.get(r.train)||0)+1); });
+  const trainSorted = [...trainMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const trains = { labels: trainSorted.map(t=>t[0]), values: trainSorted.map(t=>t[1]) };
+  const repeatOffenderTrains = [...trainMap.values()].filter(v=>v>=3).length;
+
+  // ---- weekday ----
+  const wdCount = [0,0,0,0,0,0,0];
+  datedTS.forEach(r=>{ wdCount[weekdayIdx(r.date)]++; });
+  const weekday = { labels: WEEKDAYS, values: wdCount };
+
+  // ---- time of day ----
+  const todBuckets = [
+    {label:'Night (00–06)', min:0, max:6},
+    {label:'Morning (06–12)', min:6, max:12},
+    {label:'Afternoon (12–18)', min:12, max:18},
+    {label:'Evening (18–24)', min:18, max:24}
+  ];
+  const todVals = todBuckets.map(()=>0);
+  withCat.forEach(r=>{
+    const h = parseHour(r.actArr);
+    if(h==null) return;
+    const bi = todBuckets.findIndex(b=>h>=b.min && h<b.max);
+    if(bi>=0) todVals[bi]++;
+  });
+  const timeOfDay = { labels: todBuckets.map(b=>b.label), values: todVals };
+
+  // ---- action breakdown ----
+  const actMap = new Map();
+  withCat.forEach(r=>{ actMap.set(r.actionLabel, (actMap.get(r.actionLabel)||0)+1); });
+  const actSorted = [...actMap.entries()].sort((a,b)=>b[1]-a[1]);
+  const actionBreakdown = { labels: actSorted.map(a=>a[0]), values: actSorted.map(a=>a[1]) };
+
+  // ---- station booked ----
+  const stMap = new Map();
+  withCat.forEach(r=>{ if(r.station) stMap.set(r.station, (stMap.get(r.station)||0)+1); });
+  const stationBooked = [...stMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // ---- month x category matrix (top 10 categories) ----
+  const top10cat = top10.map(c=>c[0]);
+  const matrix = monthsSorted.map(mo=>top10cat.map(()=>0));
+  datedTS.forEach(r=>{
+    if(!top10cat.includes(r.cat)) return;
+    const key = r.date.getFullYear()+'-'+String(r.date.getMonth()+1).padStart(2,'0');
+    const mi = monthsSorted.findIndex(m=>m.ym===key);
+    const ci = top10cat.indexOf(r.cat);
+    if(mi>=0) matrix[mi][ci]++;
+  });
+  const table = { months: monthsSorted.map(m=>m.label), categories: top10cat, matrix };
+
+  // ---- data quality ----
+  const total = withCat.length;
+  const missingDate = withCat.length - dated.length;
+  const missingDetention = withCat.filter(r=>r.detentionMin==null).length;
+  const missingSupervisor = withCat.filter(r=>!r.supervisor).length;
+  const nameEnteredAsReason = withCat.filter(r=>r.cat==='Unspecified (Name Entered)').length;
+  const now = new Date();
+  const futureDated = dated.filter(r=>r.date > now);
+  const dataQuality = { total, missingDate, missingDetention, missingSupervisor, nameEnteredAsReason, futureDated: futureDated.length, futureDatedRows: futureDated.map(r=>r.sr+': '+r.dateRaw) };
+
+  // ---- KPIs ----
+  const totalOccurrences = total;
+  const detCount = withCat.filter(r=>r.detentionMin!=null).length;
+  const detSumAll = withCat.reduce((s,r)=> s + (r.detentionMin!=null? r.detentionMin:0), 0);
+  const topCat = catSorted[0] || ['—',0];
+  const peakMonthIdx = monthly.occurrences.indexOf(Math.max(...monthly.occurrences, 0));
+  const noIssueCount = catCount.get('No Issue / False Alarm') || 0;
+
+  const kpis = {
+    total_occurrences: totalOccurrences,
+    total_detention_hours: Math.round((detSumAll/60)*10)/10,
+    avg_detention_min: detCount>0 ? Math.round((detSumAll/detCount)*10)/10 : 0,
+    pct_no_issue: total>0 ? Math.round((noIssueCount/total)*1000)/10 : 0,
+    top_category: topCat[0],
+    top_category_pct: total>0 ? Math.round((topCat[1]/total)*1000)/10 : 0,
+    peak_month: monthly.labels[peakMonthIdx] || '—',
+    peak_month_val: monthly.occurrences[peakMonthIdx] || 0,
+    high_detention_count: highDetCount,
+    months_covered: monthly.labels.length || 1,
+    detention_logged_pct: total>0 ? Math.round((detCount/total)*1000)/10 : 0,
+    repeat_offender_trains: repeatOffenderTrains,
+    unique_trains: trainMap.size
+  };
+
+  // ---- log rows for drilldown ----
+  const LOG = withCat.map(r=>({
+    month: r.date ? (r.date.toLocaleString('en-US',{month:'short'})+' '+r.date.getFullYear()) : 'Unknown',
+    date: r.date ? r.date.toLocaleDateString('en-GB') : (r.dateRaw||'—'),
+    train: r.train,
+    pf: r.pf,
+    cat: r.cat,
+    reason: r.reasonRaw,
+    sup: r.supervisor,
+    action: r.actionLabel,
+    det: r.detentionMin
+  }));
+
+  return { DATA: { kpis, monthly, categories, stacked, pf, supervisors, top_reasons, detention_buckets, trains, weekday, timeOfDay, actionBreakdown, stationBooked, table, dataQuality, rangeLabel: rangeTextLabel }, LOG };
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderAll(DATA, LOG){
+  document.getElementById('rangeLabel').textContent = DATA.rangeLabel;
+
+  const PALETTE = getPalette();
+  const gridColor = getGridColor();
+  const textColor = getTextColor();
+
+  const k = DATA.kpis;
+  const kpis = [
+    {lbl:'Total Occurrences', val:k.total_occurrences.toLocaleString(), sub:k.months_covered+' month(s) filtered'},
+    {lbl:'Top Fault Category', val:k.top_category_pct+'%', sub:k.top_category, cls:'warn'},
+    {lbl:'Peak Month', val:k.peak_month, sub:k.peak_month_val+' occurrences', cls:'crit'},
+    {lbl:'No-Issue / False Alarm Rate', val:k.pct_no_issue+'%', sub:'"no issue found" on inspection', cls:'good'},
+    {lbl:'Avg Detention', val:k.avg_detention_min+' min', sub:k.high_detention_count+' incidents over 30 min', cls:'warn'},
+    {lbl:'Detention Logged', val:k.detention_logged_pct+'%', sub:'of records have a timed entry', cls:'crit'},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(x=>`
+    <div class="kpi ${x.cls||''}">
+      <div class="lbl">${x.lbl}</div>
+      <div class="val">${x.val}</div>
+      <div class="sub">${x.sub}</div>
+    </div>`).join('');
+
+  /* Trend + stations */
+  const m = DATA.monthly;
+  const peakIdx = m.occurrences.indexOf(Math.max(...m.occurrences, 0));
+  document.getElementById('stations').innerHTML = m.labels.map((lbl,i)=>`
+    <div class="station ${i===peakIdx?'peak':''}">
+      <div class="peak-badge">${i===peakIdx?'PEAK':''}</div>
+      <div class="node"></div>
+      <div class="val">${m.occurrences[i]}</div>
+      <div class="lbl">${lbl.split(' ')[0]}</div>
+    </div>`).join('');
+
+  upsertChart('trendChart', {
+    data:{ labels:m.labels, datasets:[
+      {type:'bar', label:'Occurrences', data:m.occurrences, backgroundColor:isDarkMode()?'rgba(56,189,248,.25)':'rgba(37,99,235,.2)', borderColor:isDarkMode()?'#38bdf8':'#2563eb', borderWidth:1, borderRadius:2, yAxisID:'y'},
+      {type:'line', label:'Total detention (min)', data:m.total_detention, borderColor:'#f87171', backgroundColor:'#f87171', pointRadius:3, spanGaps:false, tension:.3, yAxisID:'y1'}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{legend:{labels:{color:textColor, font:{size:10.5}}}, tooltip:{callbacks:{afterBody:(items)=>{
+        const i = items[0].dataIndex;
+        if(m.recorded_count[i]===0) return 'Detention time not logged this month';
+        return '';
+      }}}},
+      scales:{ y:{position:'left', grid:{color:gridColor}, ticks:{color:textColor}, title:{display:true,text:'occurrences',color:textColor,font:{size:10}}},
+        y1:{position:'right', grid:{display:false}, ticks:{color:textColor}, title:{display:true,text:'minutes',color:textColor,font:{size:10}}} }
+    }
+  });
+
+  /* Category breakdown (Top 10 Chart + Others Tab) */
+  const c = DATA.categories;
+  document.getElementById('catNote').textContent = c.totalCategories + ' categories auto-classified from free-text reason logs';
+  document.getElementById('othersBadgeCount').textContent = c.othersList.length;
+
+  // Chart labels: Top 10 categories + Others (if exists)
+  const catBarLabels = [...c.top10Labels];
+  const catBarValues = [...c.top10Values];
+  if(c.othersSum > 0){
+    catBarLabels.push('Others (Combined)');
+    catBarValues.push(c.othersSum);
+  }
+
+  upsertChart('categoryBar', {
+    type:'bar', data:{labels:catBarLabels, datasets:[{data:catBarValues, backgroundColor:catBarLabels.map((_,i)=> i===10 ? textColor : PALETTE[i%PALETTE.length])}]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, title:{display:true, text:'Top 10 Categories' + (c.othersSum>0 ? ' + Others':''), color:textColor, font:{size:10.5}}},
+      scales:{x:{grid:{color:gridColor}, ticks:{color:textColor}}, y:{grid:{display:false}, ticks:{color:textColor, font:{size:9.5}}}} }
+  });
+
+  // Render Others list tab
+  const othersListEl = document.getElementById('othersCategoryList');
+  const totalOcc = DATA.kpis.total_occurrences || 1;
+  if(c.othersList.length > 0){
+    const maxOthersVal = Math.max(...c.othersList.map(o => o.count), 1);
+    othersListEl.innerHTML = c.othersList.map((item, i) => {
+      const pct = ((item.count / totalOcc) * 100).toFixed(1);
+      return `
+        <li>
+          <div class="n">${String(i + 11).padStart(2, '0')}</div>
+          <div>
+            <div class="txt" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>${item.label}</span>
+              <span style="color:var(--amber); font-family:'IBM Plex Mono',monospace; font-size:11px; margin-left:8px;">${item.count} (${pct}%)</span>
+            </div>
+            <div class="bar-bg"><div class="bar-fill alt" style="width:${(item.count / maxOthersVal * 100).toFixed(0)}%"></div></div>
+          </div>
+          <div class="cnt">${item.count}</div>
+        </li>`;
+    }).join('');
+  } else {
+    othersListEl.innerHTML = '<li style="color:var(--text-dim); padding:20px 0; text-align:center;">No additional categories in Others for the selected period.</li>';
+  }
+
+  const st = DATA.stacked;
+  const stCats = Object.keys(st.series);
+  upsertChart('stackedChart', {
+    type:'bar', data:{ labels:st.labels, datasets:stCats.map((cat,i)=>({label:cat, data:st.series[cat], backgroundColor:PALETTE[i%PALETTE.length], stack:'s'})) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{boxWidth:9, font:{size:9}, color:textColor}}, title:{display:true, text:'Composition by month (top categories)', color:textColor, font:{size:10.5}}},
+      scales:{x:{stacked:true, grid:{display:false}, ticks:{color:textColor, font:{size:9}}}, y:{stacked:true, grid:{color:gridColor}, ticks:{color:textColor}}} }
+  });
+
+  const wd = DATA.weekday;
+  upsertChart('weekdayChart', {
+    type:'bar', data:{labels:wd.labels, datasets:[{data:wd.values, backgroundColor:isDarkMode()?'#38bdf8':'#2563eb'}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:textColor}}, y:{grid:{color:gridColor}, ticks:{color:textColor}}}}
+  });
+
+  const tod = DATA.timeOfDay;
+  upsertChart('todChart', {
+    type:'bar', data:{labels:tod.labels, datasets:[{data:tod.values, backgroundColor:isDarkMode()?'#a78bfa':'#8b5cf6'}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:textColor, font:{size:9.5}}}, y:{grid:{color:gridColor}, ticks:{color:textColor}}}}
+  });
+
+  const pf = DATA.pf;
+  upsertChart('pfChart', {
+    type:'bar', data:{labels:pf.labels.map(x=>'PF '+x), datasets:[{data:pf.values, backgroundColor:isDarkMode()?'#38bdf8':'#2563eb'}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:textColor}}, y:{grid:{color:gridColor}, ticks:{color:textColor}}}}
+  });
+
+  const tr = DATA.trains;
+  upsertChart('trainChart', {
+    type:'bar', data:{labels:tr.labels, datasets:[{data:tr.values, backgroundColor:'#f87171'}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:gridColor}, ticks:{color:textColor}}, y:{grid:{display:false}, ticks:{color:textColor}}}}
+  });
+
+  const db = DATA.detention_buckets;
+  upsertChart('detChart', {
+    type:'bar', data:{labels:db.labels, datasets:[{data:db.values, backgroundColor:db.labels.map((_,i)=> i>=4?'#f87171':'#34d399')}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{color:textColor, font:{size:9}}}, y:{grid:{color:gridColor}, ticks:{color:textColor}}}}
+  });
+
+  const sup = DATA.supervisors;
+  upsertChart('supChart', {
+    type:'bar', data:{labels:sup.labels, datasets:[{data:sup.occurrences, backgroundColor:isDarkMode()?'#a78bfa':'#8b5cf6'}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:gridColor}, ticks:{color:textColor}}, y:{grid:{display:false}, ticks:{color:textColor, font:{size:9.5}}}}}
+  });
+
+  const trs = DATA.top_reasons;
+  const maxRe = Math.max(...trs.values, 1);
+  document.getElementById('topReasonsList').innerHTML = trs.labels.map((lbl,i)=>`
+    <li>
+      <div class="n">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="txt">${lbl}</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${(trs.values[i]/maxRe*100).toFixed(0)}%"></div></div>
+      </div>
+      <div class="cnt">${trs.values[i]}</div>
+    </li>`).join('');
+
+  const ab = DATA.actionBreakdown;
+  upsertChart('actionChart', {
+    type:'bar', data:{labels:ab.labels, datasets:[{data:ab.values, backgroundColor:ab.labels.map((_,i)=>PALETTE[i%PALETTE.length])}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:gridColor}, ticks:{color:textColor}}, y:{grid:{display:false}, ticks:{color:textColor, font:{size:9.5}}}}}
+  });
+
+  const sb = DATA.stationBooked;
+  const maxSb = Math.max(...sb.map(s=>s[1]), 1);
+  document.getElementById('stationList').innerHTML = sb.length ? sb.map((s,i)=>`
+    <li>
+      <div class="n">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="txt">${s[0]}</div>
+        <div class="bar-bg"><div class="bar-fill alt" style="width:${(s[1]/maxSb*100).toFixed(0)}%"></div></div>
+      </div>
+      <div class="cnt">${s[1]}</div>
+    </li>`).join('') : '<li style="color:var(--text-dim);">No staff-booking-forward entries detected</li>';
+
+  const tbl = DATA.table;
+  const maxCell = Math.max(...tbl.matrix.flat(), 1);
+  let matrixHtml = '<thead><tr><th>Month</th>' + tbl.categories.map(cc=>`<th class="cat-col">${cc}</th>`).join('') + '</tr></thead><tbody>';
+  tbl.months.forEach((mn,ri)=>{
+    matrixHtml += `<tr><td class="rowlabel">${mn}</td>` + tbl.matrix[ri].map(v=>{
+      let cls='num';
+      if(v>0 && v>=maxCell*0.5) cls+=' hi';
+      else if(v>0 && v>=maxCell*0.2) cls+=' mid';
+      return `<td class="${cls}">${v||''}</td>`;
+    }).join('') + '</tr>';
+  });
+  matrixHtml += '</tbody>';
+  document.getElementById('matrixTable').innerHTML = matrixHtml;
+
+  const dq = DATA.dataQuality;
+  const dqItems = [
+    {n: dq.missingDate, t:'Rows with a date that could not be parsed — check the Date column formatting in the sheet'},
+    {n: dq.missingDetention + ' ('+(dq.total? Math.round(dq.missingDetention/dq.total*100):0)+'%)', t:'Rows with no Detention Time logged — treat monthly detention totals as partial'},
+    {n: dq.missingSupervisor, t:'Rows with no Supervisor recorded'},
+    {n: dq.nameEnteredAsReason, t:"Rows where the Reasons field appears to contain a person's name instead of a fault description — likely a data-entry slip"},
+    {n: dq.futureDated, t:'Rows dated after today — almost certainly a typo\'d year in the Date column. Excluded from the timeline/matrix charts but still counted in totals below.'}
+  ];
+  document.getElementById('dqGrid').innerHTML = dqItems.map(x=>`<div class="dq-item"><div class="n">${x.n}</div><div class="t">${x.t}</div></div>`).join('');
+
+  /* drilldown */
+  const fMonth = document.getElementById('fMonth');
+  const fCategory = document.getElementById('fCategory');
+  const fSearch = document.getElementById('fSearch');
+  const logBody = document.getElementById('logBody');
+  const fCount = document.getElementById('fCount');
+
+  const months = [...new Set(LOG.map(r=>r.month))];
+  const cats = [...new Set(LOG.map(r=>r.cat))].sort();
+  fMonth.innerHTML = '<option value="">All months</option>' + months.map(mo=>`<option value="${mo}">${mo}</option>`).join('');
+  fCategory.innerHTML = '<option value="">All categories</option>' + cats.map(ca=>`<option value="${ca}">${ca}</option>`).join('');
+
+  function renderLog(){
+    const mo = fMonth.value, ca = fCategory.value, q = fSearch.value.trim().toLowerCase();
+    let rows = LOG.filter(r=>{
+      if(mo && r.month!==mo) return false;
+      if(ca && r.cat!==ca) return false;
+      if(q){
+        const hay = ((r.reason||'')+' '+(r.train||'')+' '+(r.sup||'')).toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    fCount.textContent = rows.length.toLocaleString() + ' of ' + LOG.length.toLocaleString() + ' records';
+    const shown = rows.slice(0, 400);
+    logBody.innerHTML = shown.map(r=>`
+      <tr>
+        <td class="mono">${r.date||'—'}</td>
+        <td class="mono">${r.train||'—'}</td>
+        <td class="mono">${r.pf||'—'}</td>
+        <td><span class="tag">${r.cat}</span></td>
+        <td>${r.reason||'—'}</td>
+        <td>${r.sup||'—'}</td>
+        <td>${r.action||'—'}</td>
+        <td class="mono ${(r.det!==null && r.det>30)?'det-hi':''}">${r.det!==null && r.det!==undefined ? r.det+' min':'—'}</td>
+      </tr>`).join('') + (rows.length>400 ? `<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:12px;">showing first 400 of ${rows.length} matching rows — refine filters to narrow further</td></tr>` : '');
+  }
+  [fMonth, fCategory, fSearch].forEach(el=>el.oninput = renderLog);
+  renderLog();
+
+  document.getElementById('loggedNote').textContent = 'Detention-time field populated for ' + k.detention_logged_pct + '% of records · ' + k.unique_trains + ' unique trains · ' + k.repeat_offender_trains + ' repeat-offender rakes (3+ occurrences).';
+}
+
+/* ============================================================
+   PROCESS AND RE-RENDER BY TIMEFRAME
+   ============================================================ */
+function processAndRender(){
+  if(!ALL_PARSED_RECORDS.length) return;
+  const timeframe = document.getElementById('timeRangeSelect').value;
+  const { records, label } = filterRecordsByTimeframe(ALL_PARSED_RECORDS, timeframe);
+  const { DATA, LOG } = computeAggregates(records, label);
+  renderAll(DATA, LOG);
+}
+
+/* ============================================================
+   FETCH + ORCHESTRATION
+   ============================================================ */
+async function fetchAndRender(){
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('syncStatus');
+  const errBanner = document.getElementById('errorBanner');
+  const infoBanner = document.getElementById('infoBanner');
+  const content = document.getElementById('mainContent');
+  btn.disabled = true;
+  btn.textContent = '↻ Syncing…';
+  status.textContent = 'Fetching latest data from Google Sheets…';
+  errBanner.style.display = 'none';
+  infoBanner.style.display = 'none';
+
+  function parseCSVTextToRecords(csvText){
+    const parsed = Papa.parse(csvText, {header:true, skipEmptyLines:true});
+    if(!parsed.data || !parsed.data.length) throw new Error('Sheet returned no rows');
+    const H = resolveHeaders(parsed.meta.fields || []);
+    if(!H.date && !H.train && !H.reasons){
+      throw new Error('Could not recognize the sheet columns — check header names match Date / Train No. / Reasons etc.');
+    }
+    const records = buildRecords(parsed.data, H);
+    if(!records.length) throw new Error('No usable rows after cleaning');
+    return records;
+  }
+
+  try{
+    const cb = 'cb=' + Date.now();
+    const candidates = [
+      SHEET_CSV_URL + (SHEET_CSV_URL.includes('?') ? '&' : '?') + cb,
+      SHEET_CSV_URL.replace('&single=true','') + (SHEET_CSV_URL.includes('?') ? '&' : '?') + cb
+    ];
+    let res = null, lastErr = null;
+    for(const url of candidates){
+      try{
+        const r = await fetch(url, {cache:'no-store', redirect:'follow'});
+        if(r.ok){ res = r; break; }
+        lastErr = new Error('HTTP ' + r.status + ' from Google Sheets');
+      }catch(e){ lastErr = e; }
+    }
+    if(!res) throw lastErr || new Error('Network request failed');
+    const csvText = await res.text();
+    ALL_PARSED_RECORDS = parseCSVTextToRecords(csvText);
+    processAndRender();
+    content.classList.remove('loading-dim');
+    status.textContent = 'Last synced ' + new Date().toLocaleString();
+  }catch(err){
+    // Fall back to embedded snapshot dataset
+    try{
+      const EMBEDDED_SNAPSHOT_CSV = `Sr No.,Date,Train No.,PF,Adv Arr,Adv Dep,Act Arr,Act Dep,CWC No,Supervisor,Reasons,Action Taken,Detention Time,Remarks
+1,2025-08-01,12149,4,10:25:00,10:35:00,10:04:00,10:35:00,58,Rishi Raj Verma,Automatic Pressure Drop,Attended & Same conditiion allowed,0,
+2,2025-08-01,12138,3,18:35:00,18:45:00,18:48:00,18:58:00,66,S S Warkade,Axle Box cover earthing Stud missing,Stud fitted & allowed ok,0,
+3,2025-08-02,12642,4,17:50:00,17:55:00,17:54:00,18:01:00,77,Ankit Raikwar,Automatic Pressure Drop,Attended & Same conditiion allowed,0:02:00,
+4,2025-08-03,19484,3,21:50:00,22:00:00,02:38:00,02:54:00,86,Mrityunjay Vidyarthi,BC Pipe damage,Same allowed & One Staff bkd to KNW ,00:06,"Staff booked upto KNW
+Shri Ram Naresh Meena
+Mob. 7701097856"
+5,2025-08-03,12791,6,23:35:00,23:45:00,23:55:00,00:05:00,07,Rajneesh Chouhan,Automatic Pressure Drop,Attended & Same conditiion allowed,0,
+6,2025-08-03,22537,2,11:50:00,11:55:00,13:47:00,13:54:00,95,Bhaiyalal Sejkar,Automatic Pressure Drop,Attended & Same conditiion allowed,0:02:00,
+7,04.08.2025,15017,5,20:40:00,20:50:00,20:39:00,20:50:00,30,Bheemrao Awale,Automatic Pressure Drop,Attended & Same conditiion allowed,00:01,
+8,04.08.2025,11058,3,11:25:00,11:35:00,12:00:00,12:23:00,13,A D Sejekar,Automatic Pressure Drop,Attended & same conditiion allowed,00:13,
+9,04.08.2025,12141,5,10:55:00,11:05:00,10:45:00,11:05:00,12,Rampratap Verma,Automatic Pressure Drop,Attended & same conditiion allowed,0,
+10,05.08.2025,12792,6,05:45,06:00,05:46,06:00,36,Radheshyam Sahu,Primary Spring Broken,Same allowed & One Staff bkd to NGP ,0,"Staff booked upto NGP 
+Shri Gullu Matekar/Tech-III
+Mob No.9926535339"
+11,05.08.2025,11071,1,02:10,02:20,02:23,02:36,,Deepesh Kulkarni,ACP Isolated,Attended & Put Right,00:03,
+12,06.08.2025,20903,6,09:35,09:45,09:20,09;55,,Ankit Raikwar,CBC Safety lock pin not properly fitted,Attended ,00:25,
+13,06.08.2025,12141,4,10:55:00,11:05:00,11:11:00,11:23:00,54,Rampratap Verma,Automatic Pressure Drop,attended & Same conditiion allowed,00:02,
+14,06.08.2025,15065,1,02:20,02:30,05:00,05:10,50,Bhaiyalal Sejkar,Automatic Pressure Drop,attended & Same conditiion allowed,0,
+15,06.08.2025,12103,1,01:50,02:00,01:38,02:00,48,Mrityunjay Vidyarthi,Automatic Pressure Drop,Attended & Same conditiion allowed,00:12,
+1168,21.07.2026,20846,3,21:50:00,22:00:00,21:48:00,22:00:00, ,SECR/217737/LWSCN,Ankit Raikwar,Incoming guard inform about BP air hose uncoupled in above Coach Due to CRO,BP palm secured by GI wire ,
+1169,22.07.2026,22132,5,17:40:00,17:50:00,17:40:00,18:00:00,During Rolling IN,"CR 257198
+ LS-5A",Rishiraj,Primary Spring broken,Attended & Allowed to permissible limit.,
+1170,22.07.2026,11274,2,13:20:00,-,13:25:00,-,-,-,Deepesh Kulkarni,Automatic Pressure Drop,Attended & As per TM three times pressure drop ,
+1171,23.07.2026,12617,1,01:05:00,01:15:00,01:38:00,01:48:00,BSL-213,CR/193990/LWSCN,A.D.Sejkar,Automatic Pressure Drop,As per TM No any pressure drop occan in between BSL-ET Section. No Abnormally found during Rolling IN/OUT Examination,
+`;
+      ALL_PARSED_RECORDS = parseCSVTextToRecords(EMBEDDED_SNAPSHOT_CSV);
+      processAndRender();
+      content.classList.remove('loading-dim');
+      infoBanner.innerHTML = 'Showing dataset snapshot (' + SNAPSHOT_DATE + '). Click Refresh Data to sync live numbers from Google Sheets.';
+      infoBanner.style.display = 'block';
+      status.textContent = 'Showing snapshot data — synced at ' + new Date().toLocaleTimeString();
+    }catch(err2){
+      errBanner.innerHTML = 'Could not refresh data: <b>' + (err && err.message ? err.message : 'Error') + '</b>';
+      errBanner.style.display = 'block';
+      status.textContent = 'Sync failed at ' + new Date().toLocaleTimeString();
+    }
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '↻ Refresh Data';
+  }
+}
+
+// Tab handlers for Section 02 Category Breakdown
+document.getElementById('tabTop10Btn').addEventListener('click', () => {
+  document.getElementById('top10TabContent').style.display = 'block';
+  document.getElementById('othersTabContent').style.display = 'none';
+  document.getElementById('tabTop10Btn').className = 'cat-tab-btn active';
+  document.getElementById('tabOthersBtn').className = 'cat-tab-btn';
+});
+
+document.getElementById('tabOthersBtn').addEventListener('click', () => {
+  document.getElementById('top10TabContent').style.display = 'none';
+  document.getElementById('othersTabContent').style.display = 'block';
+  document.getElementById('tabOthersBtn').className = 'cat-tab-btn active';
+  document.getElementById('tabTop10Btn').className = 'cat-tab-btn';
+});
+
+// Timeframe select event listener
+document.getElementById('timeRangeSelect').addEventListener('change', processAndRender);
+document.getElementById('refreshBtn').addEventListener('click', fetchAndRender);
+
+// Theme switcher
+function setTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('controlboard_theme', theme);
+  const icon = document.getElementById('themeIcon');
+  const label = document.getElementById('themeLabel');
+  if(theme === 'dark'){
+    if(icon) icon.textContent = '🌙';
+    if(label) label.textContent = 'Dark Mode';
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = '#334155';
+  } else {
+    if(icon) icon.textContent = '☀️';
+    if(label) label.textContent = 'Light Mode';
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.borderColor = '#e2e8f0';
+  }
+  processAndRender();
+}
+
+const themeBtn = document.getElementById('themeToggleBtn');
+if(themeBtn){
+  themeBtn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+}
+
+// Initial Theme & Data Load
+const savedTheme = localStorage.getItem('controlboard_theme') || 'dark';
+setTheme(savedTheme);
+fetchAndRender();
+</script>
+</body>
+</html>
