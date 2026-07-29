@@ -1433,8 +1433,14 @@ function initReportModal(){
     });
   }
 
-  document.getElementById('downloadReportBtn').addEventListener('click', () => generateReport('download'));
-  document.getElementById('printReportBtn').addEventListener('click', () => generateReport('print'));
+  document.getElementById('downloadReportBtn').addEventListener('click', () => {
+    generateReport('download');
+    modal.classList.remove('active');
+  });
+  document.getElementById('printReportBtn').addEventListener('click', () => {
+    generateReport('print');
+    modal.classList.remove('active');
+  });
 }
 
 function generateReport(mode){
