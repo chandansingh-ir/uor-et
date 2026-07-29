@@ -1,6 +1,8 @@
 {
-  "name": "Unusual Occurrence Control Board",
+  "name": "ET Station Dashboard",
   "description": "Coaching Depot live log analysis board for train detentions, coach faults, and Rail Madad watering complaints monitoring with real-time Google Sheet sync.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.5.4/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.5.4/papaparse.min.js" crossorigin="anonymous"></script>
 <style>
   :root, [data-theme="dark"]{
     --bg-base:#0f172a;
@@ -258,12 +258,23 @@
   .matrix-table td.num.mid{color:var(--text);background:rgba(56,189,248,.15);border-radius:2px;}
   .matrix-table td.rowlabel{font-family:'IBM Plex Mono',monospace;color:var(--text);position:sticky;left:0;background:var(--bg-panel);font-weight:600;}
 
-  .dq-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
-  .dq-item{background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:var(--card-shadow);}
-  .dq-item .n{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--amber);}
-  .dq-item .t{font-size:11px;color:var(--text-mute);margin-top:4px;line-height:1.4;}
-  @media(max-width:980px){.dq-grid{grid-template-columns:repeat(2,1fr);}}
-  @media(min-width:981px) and (max-width:1240px){.dq-grid{grid-template-columns:repeat(3,1fr);}}
+  /* Report Modal */
+  .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);backdrop-filter:blur(5px);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.active{display:flex;}
+  .modal-card{background:var(--bg-panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);padding:24px;color:var(--text);}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px;}
+  .modal-head h3{font-family:'Oswald',sans-serif;font-size:20px;margin:0;color:var(--text);text-transform:uppercase;letter-spacing:.02em;}
+  .modal-close{background:transparent;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1;}
+  .modal-close:hover{color:var(--text);}
+  .chart-select-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0;background:var(--bg-panel-alt);padding:14px;border-radius:10px;border:1px solid var(--line-soft);}
+  @media(max-width:600px){.chart-select-grid{grid-template-columns:1fr;}}
+  .chart-select-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;user-select:none;}
+  .chart-select-item input{accent-color:var(--amber);cursor:pointer;}
+  .btn-group{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap;}
+  .btn-primary{background:var(--amber);color:#ffffff;border:none;padding:10px 16px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn-primary:hover{opacity:0.9;}
+  .btn-secondary{background:var(--bg-panel-alt);color:var(--text);border:1px solid var(--line);padding:10px 16px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:12px;cursor:pointer;}
+  .btn-secondary:hover{border-color:var(--amber);color:var(--amber);}
 
   footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--text-dim);font-size:11px;font-family:'IBM Plex Mono',monospace;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
   .loading-dim{opacity:.4;pointer-events:none;transition:opacity .2s;}
@@ -283,6 +294,9 @@
         <a href="watering.html" class="theme-toggle-btn" id="wateringDashBtn" style="text-decoration:none;background:var(--amber);color:#ffffff;border:none;font-weight:700;" title="Open Rail Madad Watering Complaints Dashboard">
           💧 Watering Dashboard
         </a>
+        <button id="generateReportBtn" class="theme-toggle-btn" style="background:linear-gradient(135deg, #10b981, #059669);color:#ffffff;border:none;font-weight:700;" title="Generate Analysis Report for Selected Period and Selected Charts">
+          📄 Generate Report
+        </button>
         <div class="time-select-wrap">
           <label for="timeRangeSelect">Timeframe:</label>
           <select id="timeRangeSelect">
@@ -440,21 +454,10 @@
     </div>
   </div>
 
-  <!-- 08 DATA QUALITY -->
+  <!-- 08 DRILLDOWN LOG -->
   <div class="section">
     <div class="section-head">
-      <span class="idx">08</span><h2>Data Quality &amp; Coverage</h2>
-      <span class="note">what to fix at source in the register</span>
-    </div>
-    <div class="panel">
-      <div class="dq-grid" id="dqGrid"></div>
-    </div>
-  </div>
-
-  <!-- 09 DRILLDOWN LOG -->
-  <div class="section">
-    <div class="section-head">
-      <span class="idx">09</span><h2>Occurrence Log — Drilldown</h2>
+      <span class="idx">08</span><h2>Occurrence Log — Drilldown</h2>
       <span class="note">filter &amp; search the full register</span>
     </div>
     <div class="panel">
@@ -484,7 +487,66 @@
 
 </div>
 
+<!-- REPORT GENERATOR MODAL -->
+<div id="reportModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h3 id="reportModalTitle">📄 Generate Executive Analysis Report</h3>
+        <div style="font-size:11.5px;color:var(--text-mute);margin-top:2px;">Coaching Depot Itarsi &nbsp;·&nbsp; Report Export Tool</div>
+      </div>
+      <button class="modal-close" id="closeReportModalBtn">&times;</button>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11.5px;font-weight:700;color:var(--amber);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Active Reporting Period:</div>
+      <div id="reportPeriodDisplay" style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;background:var(--bg-panel-alt);padding:8px 12px;border-radius:6px;border:1px solid var(--line-soft);color:var(--text);">
+        -- Loading Period --
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11.5px;font-weight:700;color:var(--text-mute);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;">Document Title / Heading:</label>
+      <input type="text" id="reportTitleInput" style="width:100%;background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);padding:8px 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;" value="Unusual Occurrence &amp; Detention Analysis Report">
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <label style="font-size:11.5px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;">Select Charts to Include:</label>
+      <div style="display:flex;gap:10px;">
+        <button id="selectAllChartsBtn" type="button" style="background:none;border:none;color:var(--amber);font-size:11px;font-family:'IBM Plex Mono',monospace;cursor:pointer;text-decoration:underline;">Select All</button>
+        <button id="clearAllChartsBtn" type="button" style="background:none;border:none;color:var(--text-mute);font-size:11px;font-family:'IBM Plex Mono',monospace;cursor:pointer;text-decoration:underline;">Clear All</button>
+      </div>
+    </div>
+
+    <div class="chart-select-grid" id="chartSelectGrid"></div>
+
+    <div style="margin-top:12px;background:var(--bg-panel-alt);padding:12px;border-radius:8px;border:1px solid var(--line-soft);">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Document Content Options</div>
+      <label class="chart-select-item" style="margin-bottom:6px;">
+        <input type="checkbox" id="incKpiCheck" checked>
+        <span>Include Key Performance Indicators (KPI Summary Grid)</span>
+      </label>
+      <label class="chart-select-item">
+        <input type="checkbox" id="incTableCheck" checked>
+        <span>Include Filtered Records Register Table</span>
+      </label>
+    </div>
+
+    <div class="btn-group">
+      <button type="button" class="btn-secondary" id="cancelReportBtn">Cancel</button>
+      <button type="button" class="btn-primary" id="printReportBtn" style="background:var(--blue);">🖨️ Print / Save as PDF</button>
+      <button type="button" class="btn-primary" id="downloadReportBtn" style="background:linear-gradient(135deg, #10b981, #059669);">📥 Download Report File (.html)</button>
+    </div>
+  </div>
+</div>
+
 <script>
+window.addEventListener('error', function(e) {
+  console.warn('Captured window error:', e.error || e.message);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.warn('Captured promise rejection:', e.reason);
+});
 /* ============================================================
    CONFIG
    ============================================================ */
@@ -1121,16 +1183,6 @@ function renderAll(DATA, LOG){
   matrixHtml += '</tbody>';
   document.getElementById('matrixTable').innerHTML = matrixHtml;
 
-  const dq = DATA.dataQuality;
-  const dqItems = [
-    {n: dq.missingDate, t:'Rows with a date that could not be parsed — check the Date column formatting in the sheet'},
-    {n: dq.missingDetention + ' ('+(dq.total? Math.round(dq.missingDetention/dq.total*100):0)+'%)', t:'Rows with no Detention Time logged — treat monthly detention totals as partial'},
-    {n: dq.missingSupervisor, t:'Rows with no Supervisor recorded'},
-    {n: dq.nameEnteredAsReason, t:"Rows where the Reasons field appears to contain a person's name instead of a fault description — likely a data-entry slip"},
-    {n: dq.futureDated, t:'Rows dated after today — almost certainly a typo\'d year in the Date column. Excluded from the timeline/matrix charts but still counted in totals below.'}
-  ];
-  document.getElementById('dqGrid').innerHTML = dqItems.map(x=>`<div class="dq-item"><div class="n">${x.n}</div><div class="t">${x.t}</div></div>`).join('');
-
   /* drilldown */
   const fMonth = document.getElementById('fMonth');
   const fCategory = document.getElementById('fCategory');
@@ -1325,9 +1377,221 @@ if(themeBtn){
   });
 }
 
+// --- REPORT GENERATION MODULE ---
+const INDEX_REPORT_CHARTS = [
+  { id: 'trendChart', label: 'Monthly Occurrence Timeline & Detention Minutes' },
+  { id: 'categoryBar', label: 'Top 10 Fault Categories Breakdown' },
+  { id: 'stackedChart', label: 'Monthly Category Composition (Stacked)' },
+  { id: 'weekdayChart', label: 'Occurrence by Day of Week' },
+  { id: 'todChart', label: 'Peak Occurrence Times of Day' },
+  { id: 'pfChart', label: 'Platform Occurrence Distribution' },
+  { id: 'trainChart', label: 'Top Affected Trains' },
+  { id: 'detChart', label: 'Detention Duration Buckets' },
+  { id: 'supChart', label: 'Shift Supervisors Analysis' },
+  { id: 'actionChart', label: 'Action Taken Breakdown' }
+];
+
+function initReportModal(){
+  const modal = document.getElementById('reportModal');
+  const btnOpen = document.getElementById('generateReportBtn');
+  const btnClose = document.getElementById('closeReportModalBtn');
+  const btnCancel = document.getElementById('cancelReportBtn');
+  const selectAllBtn = document.getElementById('selectAllChartsBtn');
+  const clearAllBtn = document.getElementById('clearAllChartsBtn');
+  const chartGrid = document.getElementById('chartSelectGrid');
+  const periodDisplay = document.getElementById('reportPeriodDisplay');
+
+  if(!btnOpen || !modal) return;
+
+  btnOpen.addEventListener('click', () => {
+    periodDisplay.textContent = document.getElementById('rangeLabel').textContent || 'Active Selected Timeframe';
+    
+    // Render chart checkboxes
+    chartGrid.innerHTML = INDEX_REPORT_CHARTS.map(c => `
+      <label class="chart-select-item">
+        <input type="checkbox" value="${c.id}" class="report-chart-cb" checked>
+        <span>${c.label}</span>
+      </label>
+    `).join('');
+
+    modal.classList.add('active');
+  });
+
+  const closeModal = () => modal.classList.remove('active');
+  if(btnClose) btnClose.addEventListener('click', closeModal);
+  if(btnCancel) btnCancel.addEventListener('click', closeModal);
+
+  if(selectAllBtn){
+    selectAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.report-chart-cb').forEach(cb => cb.checked = true);
+    });
+  }
+  if(clearAllBtn){
+    clearAllBtn.addEventListener('click', () => {
+      document.querySelectorAll('.report-chart-cb').forEach(cb => cb.checked = false);
+    });
+  }
+
+  document.getElementById('downloadReportBtn').addEventListener('click', () => generateReport('download'));
+  document.getElementById('printReportBtn').addEventListener('click', () => generateReport('print'));
+}
+
+function generateReport(mode){
+  const title = document.getElementById('reportTitleInput').value || 'Unusual Occurrence & Detention Analysis Report';
+  const period = document.getElementById('rangeLabel').textContent || '';
+  const incKpi = document.getElementById('incKpiCheck').checked;
+  const incTable = document.getElementById('incTableCheck').checked;
+
+  const selectedChartIds = Array.from(document.querySelectorAll('.report-chart-cb:checked')).map(cb => cb.value);
+
+  // Collect chart images
+  const chartImages = [];
+  selectedChartIds.forEach(id => {
+    const item = INDEX_REPORT_CHARTS.find(c => c.id === id);
+    const canvas = document.getElementById(id);
+    if(canvas && item){
+      try {
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        chartImages.push({ label: item.label, src: imgData });
+      } catch(e) {
+        console.warn('Canvas image extract error', e);
+      }
+    }
+  });
+
+  // KPI Content
+  let kpiHtml = '';
+  if(incKpi){
+    const kpiEl = document.getElementById('kpiRow');
+    if(kpiEl) kpiHtml = `<div class="report-section"><h2>Key Performance Indicators</h2><div class="kpi-grid">${kpiEl.innerHTML}</div></div>`;
+  }
+
+  // Charts HTML
+  let chartsHtml = '';
+  if(chartImages.length > 0){
+    chartsHtml = `<div class="report-section"><h2>Analytical Visualizations &amp; Charts</h2><div class="charts-grid">` +
+      chartImages.map(img => `
+        <div class="chart-card">
+          <h3>${img.label}</h3>
+          <img src="${img.src}" style="width:100%;height:auto;border-radius:6px;border:1px solid #cbd5e1;" />
+        </div>
+      `).join('') + `</div></div>`;
+  }
+
+  // Table Content
+  let tableHtml = '';
+  if(incTable){
+    const tableEl = document.getElementById('logTable');
+    if(tableEl){
+      tableHtml = `<div class="report-section"><h2>Detailed Filtered Occurrence Register</h2><div class="table-wrap">${tableEl.outerHTML}</div></div>`;
+    }
+  }
+
+  const generatedDate = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' });
+
+  const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title} - Coaching Depot Itarsi</title>
+<style>
+  body{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 30px; background: #ffffff; line-height: 1.5; font-size: 12px; }
+  .header-box{ border-bottom: 3px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .header-box h1{ font-size: 24px; margin: 0 0 6px 0; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }
+  .header-box .sub{ color: #475569; font-size: 12px; font-weight: bold; }
+  .header-box .meta{ text-align: right; font-size: 11px; color: #64748b; font-family: monospace; }
+  .period-badge{ display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 4px 10px; border-radius: 4px; font-weight: bold; border: 1px solid #bfdbfe; font-family: monospace; }
+  
+  .report-section{ margin-bottom: 28px; page-break-inside: avoid; }
+  .report-section h2{ font-size: 16px; color: #1e3a8a; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  .kpi-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .kpi{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .kpi .lbl{ font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+  .kpi .val{ font-size: 20px; font-weight: bold; color: #0f172a; font-family: monospace; margin: 4px 0; }
+  .kpi .sub{ font-size: 10.5px; color: #64748b; }
+
+  .dq-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dq-item{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .dq-item .n{ font-size: 18px; font-weight: bold; color: #2563eb; font-family: monospace; }
+  .dq-item .t{ font-size: 11px; color: #475569; margin-top: 4px; }
+
+  .charts-grid{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .chart-card{ background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; page-break-inside: avoid; }
+  .chart-card h3{ font-size: 12px; margin: 0 0 8px 0; color: #334155; text-align: center; }
+
+  .table-wrap{ overflow-x: auto; }
+  table{ width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td{ border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+  th{ background: #f1f5f9; color: #1e293b; font-weight: bold; text-transform: uppercase; font-size: 10px; }
+  tr:nth-child(even){ background: #f8fafc; }
+
+  .footer-sig{ margin-top: 40px; border-top: 2px solid #cbd5e1; padding-top: 20px; display: flex; justify-content: space-between; text-align: center; font-size: 11px; color: #475569; page-break-inside: avoid; }
+  .sig-box{ width: 200px; border-top: 1px dashed #94a3b8; padding-top: 6px; margin-top: 30px; }
+
+  @media print {
+    body{ padding: 0; font-size: 10pt; }
+    .charts-grid{ grid-template-columns: repeat(2, 1fr); }
+    .chart-card{ page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="header-box">
+    <div>
+      <div class="sub">INDIAN RAILWAYS &nbsp;·&nbsp; COACHING DEPOT ITARSI (ET)</div>
+      <h1>${title}</h1>
+      <div><span class="period-badge">PERIOD: ${period}</span></div>
+    </div>
+    <div class="meta">
+      <div>Generated On: ${generatedDate}</div>
+      <div>System: Live Log Analysis Engine</div>
+      <div>Depot: C&amp;W Coaching Depot, Itarsi</div>
+    </div>
+  </div>
+
+  ${kpiHtml}
+  ${chartsHtml}
+  ${tableHtml}
+
+  <div class="footer-sig">
+    <div class="sig-box">Shift In-charge (C&amp;W)<br>Coaching Depot Itarsi</div>
+    <div class="sig-box">Senior Section Engineer (C&amp;W)<br>Coaching Depot Itarsi</div>
+    <div class="sig-box">Senior Divisional Mechanical Engineer<br>Bhopal Division, WCR</div>
+  </div>
+</body>
+</html>`;
+
+  if(mode === 'download'){
+    const safePeriod = period.replace(/[^a-zA-Z0-9]/g, '_');
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Unusual_Occurrence_Report_${safePeriod}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else if(mode === 'print'){
+    const printWin = window.open('', '_blank');
+    if(printWin){
+      printWin.document.write(fullHtml);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => {
+        printWin.print();
+      }, 600);
+    } else {
+      alert("Popup blocked! Please allow popups or use 'Download Report File (.html)' instead.");
+    }
+  }
+}
+
 // Initial Theme & Data Load
 const savedTheme = localStorage.getItem('controlboard_theme') || 'dark';
 setTheme(savedTheme);
+initReportModal();
 fetchAndRender();
 </script>
 </body>
